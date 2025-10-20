@@ -2,6 +2,7 @@
 
 A modern forum/chat hybrid built with **ASP.NET Core** and **PostgreSQL**, designed for:
 - ⚡ Super‑efficient threaded discussions (leveraging Postgres `ltree` for hierarchy).
+- 💬 - hybrid social network / chat / forum experience. Allowing the interactivity of social networks with the depth of forums.It adapts to how the user wants to engage.
 - 🧩 Community charters that define purpose, values, and exclusions.
 - 🤖 AI‑assisted moderation and identity scaffolding.
 - 🎨 Lightweight, reactive UI with **HTMX + Alpine.js + Tailwind + DaisyUI**.
@@ -62,8 +63,9 @@ Communities can extend these rules but not weaken them.
 ## 🤝 Contributing
 Contributions are welcome!
 - Fork the repo and open a PR.
-- Suggest improvements to threading, governance, or monetization models.
+- Suggest improvements to threading, governance, or monetisation models.
 - Share ideas for new charter templates.
+- Initial goal will be to dogfood the system by creating a few pilot communities.
 
 ---
 
