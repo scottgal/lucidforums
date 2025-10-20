@@ -1,0 +1,38 @@
+@page
+@model LucidForums.Areas.Identity.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+
+<h1 class="text-2xl font-semibold mb-4">Welcome back</h1>
+<p class="mb-4 text-base-content/70">Sign in to continue.</p>
+
+<form method="post" class="form-control gap-3">
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Email</span>
+        </label>
+        <input asp-for="Input.Email" class="input input-bordered" autocomplete="username" />
+        <span asp-validation-for="Input.Email" class="text-error text-sm mt-1"></span>
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Password</span>
+        </label>
+        <input asp-for="Input.Password" class="input input-bordered" autocomplete="current-password" />
+        <span asp-validation-for="Input.Password" class="text-error text-sm mt-1"></span>
+    </div>
+
+    <label class="label cursor-pointer justify-start gap-3">
+        <input asp-for="Input.RememberMe" class="checkbox" />
+        <span class="label-text">Remember me</span>
+    </label>
+
+    <button type="submit" class="btn btn-primary mt-2">Sign in</button>
+
+    <div class="divider">or</div>
+    <p class="text-sm">New here? <a asp-page="/Account/Register" class="link">Create an account</a></p>
+
+    <div asp-validation-summary="ModelOnly" class="text-error text-sm"></div>
+</form>

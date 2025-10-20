@@ -1,0 +1,26 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en" data-theme="cupcake">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Account - LucidForums</title>
+    <link rel="stylesheet" href="~/css/dist/main.css" asp-append-version="true" />
+</head>
+<body class="min-h-screen bg-base-200 flex items-center justify-center p-4">
+    <main class="w-full max-w-md">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <div class="flex items-center justify-between mb-2">
+                    <a asp-area="" asp-controller="Home" asp-action="Index" class="btn btn-ghost text-lg">🌙 LucidForums</a>
+                    <a href="/" class="btn btn-sm">Home</a>
+                </div>
+                @RenderBody()
+            </div>
+        </div>
+    </main>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

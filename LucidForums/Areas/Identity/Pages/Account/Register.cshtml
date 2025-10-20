@@ -1,0 +1,41 @@
+@page
+@model LucidForums.Areas.Identity.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Create account";
+}
+
+<h1 class="text-2xl font-semibold mb-4">Create your account</h1>
+<p class="mb-4 text-base-content/70">Join the community.</p>
+
+<form method="post" class="form-control gap-3">
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Email</span>
+        </label>
+        <input asp-for="Input.Email" class="input input-bordered" autocomplete="username" />
+        <span asp-validation-for="Input.Email" class="text-error text-sm mt-1"></span>
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Password</span>
+        </label>
+        <input asp-for="Input.Password" class="input input-bordered" autocomplete="new-password" />
+        <span asp-validation-for="Input.Password" class="text-error text-sm mt-1"></span>
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Confirm password</span>
+        </label>
+        <input asp-for="Input.ConfirmPassword" class="input input-bordered" autocomplete="new-password" />
+        <span asp-validation-for="Input.ConfirmPassword" class="text-error text-sm mt-1"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-2">Create account</button>
+
+    <div class="divider">or</div>
+    <p class="text-sm">Already have an account? <a asp-page="/Account/Login" class="link">Sign in</a></p>
+
+    <div asp-validation-summary="ModelOnly" class="text-error text-sm"></div>
+</form>
