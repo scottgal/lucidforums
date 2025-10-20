@@ -1,0 +1,21 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  lucidforums:
+    build:
+      context: "D:\\Source\\lucidforums\\LucidForums"
+      dockerfile: "LucidForums/Dockerfile"
+      target: "base"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net9.0/LucidForums.dll"
+    environment:
+      ASPNETCORE_STATICWEBASSETS: "/app/bin/Debug/net9.0/LucidForums.staticwebassets.runtime.CT.json"
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    image: "lucidforums:dev"
+    ports: []
+    volumes:
+    - "D:\\Source\\lucidforums\\LucidForums\\LucidForums:/app:rw"
+    - "D:\\Source\\lucidforums\\LucidForums:/src:rw"
+    - "C:\\Users\\scott\\.nuget\\packages:/home/app/.nuget/packages"
+    working_dir: "/app"

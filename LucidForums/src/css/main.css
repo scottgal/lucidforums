@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@plugin "daisyui" {
+    themes: dark --default;
+}
+@custom-variant dark (&:where(.dark, .dark *));
+/* Spinner Styling */
+.spinner {
+    display: none; /* Initially hidden */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 50px;
+    animation: spin 1s linear infinite;
+    z-index: 1000; /* Ensure it's above everything */
+}
+
+/* Spin Animation */
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@layer utilities {
+    .btn-icon {
+        @apply btn btn-xs flex items-center justify-center w-8 h-8 rounded-md text-white text-xl;
+    }
+
+
+    .param-label {
+        @apply inline-flex items-center gap-2 whitespace-nowrap text-base font-bold text-gray-900 dark:text-gray-400;
+    }
+
+    .param-list {
+        @apply inline-flex flex-nowrap gap-4 mb-4 items-center whitespace-nowrap  px-2 py-2 bg-base-100 border border-base-300 rounded-box;
+    }
+}
+
+.btn-outline-icon {@apply btn btn-xs border mr-2 justify-center w-8 h-8 border-solid border-gray-400 border-opacity-50
+    bg-gray-800 hover:bg-gray-700;
+    
+    
+}
+
+
+.hide-if-empty:empty {
+    display: none;
+}
+
+
+[x-cloak] { display: none !important; }

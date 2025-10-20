@@ -1,0 +1,65 @@
+﻿services:
+  db:
+    image: postgres:16-alpine
+    container_name: lucidforums-postgres
+    environment:
+      POSTGRES_DB: lucidforums
+      POSTGRES_USER: lucid
+      POSTGRES_PASSWORD: lucidpassword
+#    ports:
+#      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - appnet
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lucidforums-ollama
+#    ports:
+#      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sSf http://localhost:11434/api/tags >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - appnet
+
+  lucidforums:
+    image: lucidforums
+    build:
+      context: .
+      dockerfile: LucidForums/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=lucidforums;Username=lucid;Password=lucidpassword
+      - OLLAMA_ENDPOINT=http://ollama:11434
+    ports:
+      - "8080:8080"
+    networks:
+      - appnet
+
+volumes:
+  pgdata:
+  ollama:
+
+networks:
+  appnet:
+    driver: bridge
+
