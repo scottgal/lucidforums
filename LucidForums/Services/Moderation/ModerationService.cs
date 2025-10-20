@@ -1,11 +1,11 @@
 using System.Text.Json;
 using LucidForums.Models.Entities;
-using LucidForums.Services.Llm;
 using System.Text;
+using LucidForums.Services.Ai;
 
 namespace LucidForums.Services.Moderation;
 
-public class ModerationService(IHttpClientFactory httpClientFactory, IOllamaEndpointProvider endpointProvider) : IModerationService
+public class ModerationService(ITextAiService textAi) : IModerationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -14,9 +14,6 @@ public class ModerationService(IHttpClientFactory httpClientFactory, IOllamaEndp
 
     public async Task<ModerationResult> EvaluatePostAsync(Charter charter, string content, string? model = null, CancellationToken ct = default)
     {
-        var options = endpointProvider.Options;
-        var activeModel = string.IsNullOrWhiteSpace(model) ? options.DefaultModel : model;
-
         // Prompt template instructing strict JSON output
         var userPrompt = $$"""
         Evaluate the following user post against the community charter. Decide whether to ALLOW, FLAG (needs moderator review), or REJECT (clear violation).
@@ -28,30 +25,13 @@ public class ModerationService(IHttpClientFactory httpClientFactory, IOllamaEndp
         ```
         """;
 
-        var prompt = new StringBuilder()
+        var fullPrompt = new StringBuilder()
             .AppendLine(charter.BuildSystemPrompt())
             .AppendLine()
             .AppendLine(userPrompt)
             .ToString();
 
-        var client = httpClientFactory.CreateClient("ollama");
-        var request = new
-        {
-            model = activeModel,
-            prompt,
-            options = new { temperature = 0.0, num_predict = options.MaxTokens }
-        };
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(endpointProvider.GetBaseAddress(), "/api/generate"))
-        {
-            Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(request), Encoding.UTF8, "application/json")
-        };
-
-        using var response = await client.SendAsync(httpRequest, ct);
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadAsStringAsync(ct);
-
-        var text = ExtractResponseText(body);
+        var text = await textAi.GenerateAsync(charter, userPrompt, model, ct);
 
         // Try to parse the JSON response
         try

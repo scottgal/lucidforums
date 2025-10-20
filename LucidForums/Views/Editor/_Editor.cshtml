@@ -1,0 +1,13 @@
+﻿@*
+  Reddit-like editor partial using a textarea. HTMX events are triggered from Index where needed.
+*@
+<div class="form-control">
+    <label for="postText" class="label">
+        <span class="label-text">Post text</span>
+    </label>
+    <textarea id="postText" name="text" class="textarea textarea-bordered h-48 font-mono"
+              placeholder="Write something interesting..."
+              x-on:input="() => { if (window.htmx) { htmx.trigger($el, 'changed'); } }"
+              ></textarea>
+    <label class="label"><span class="label-text-alt">Use Markdown-like shortcuts. Ctrl+B/I/E for bold/italic/code.</span></label>
+</div>

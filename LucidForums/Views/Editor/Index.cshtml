@@ -1,0 +1,67 @@
+﻿@{
+    ViewData["Title"] = ViewData["Title"] ?? "Editor";
+}
+
+<div class="max-w-3xl mx-auto" x-data="editorState()">
+    <h1 class="text-2xl font-bold mb-4">Compose</h1>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body gap-4">
+            @await Html.PartialAsync("_Editor")
+
+            <div class="flex items-center justify-between text-sm text-base-content/70 gap-4">
+                <div>
+                    <span>Characters: </span>
+                    <span id="charCount"
+                          hx-post="@Url.Action("Count", "Editor")"
+                          hx-trigger="changed from:#postText delay:200ms, keyup from:#postText delay:200ms, load"
+                          hx-vals='js:{ text: (window.easyMDE ? window.easyMDE.value() : document.getElementById("postText")?.value) }'
+                          hx-swap="outerHTML">0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="langSelect" class="opacity-70">Translate to:</label>
+                    <select id="langSelect" class="select select-bordered select-sm">
+                        <option>English</option>
+                        <option>Spanish</option>
+                        <option>French</option>
+                        <option>German</option>
+                        <option>Italian</option>
+                        <option>Portuguese</option>
+                        <option>Russian</option>
+                        <option>Chinese</option>
+                        <option>Japanese</option>
+                        <option>Korean</option>
+                    </select>
+                    <label class="label cursor-pointer gap-2">
+                        <span class="label-text">Auto translate</span>
+                        <input type="checkbox" id="autoTranslateToggle" class="toggle toggle-primary toggle-sm" checked />
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mt-6 mb-2 text-lg font-semibold">Preview</h2>
+    <div id="preview" class="prose max-w-none card bg-base-100 shadow">
+        <div class="card-body"
+             hx-post="@Url.Action("Preview", "Editor")"
+             hx-trigger="keyup from:#postText changed delay:200ms, load"
+             hx-vals='js:{ text: (window.easyMDE ? window.easyMDE.value() : document.getElementById("postText")?.value) }'
+             hx-target="#preview"
+             hx-swap="innerHTML">
+            <div class="text-base-content/60">Start typing above to see a live preview…</div>
+        </div>
+    </div>
+
+    <h2 class="mt-6 mb-2 text-lg font-semibold">Translated</h2>
+    <div id="translatedPanel" class="prose max-w-none card bg-base-100 shadow">
+        <div class="card-body">
+            <div id="translated" class="min-h-24 text-base-content/80 whitespace-pre-wrap"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css" />
+    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+}

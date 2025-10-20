@@ -19,17 +19,25 @@ builder.Services.AddIdentity<LucidForums.Models.Entities.User, Microsoft.AspNetC
     .AddEntityFrameworkStores<LucidForums.Data.ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
-// Bind Ollama options from configuration and environment
+// Bind AI and Ollama options from configuration and environment
+builder.Services.Configure<LucidForums.Services.Ai.AiOptions>(builder.Configuration.GetSection("AI"));
 builder.Services.Configure<LucidForums.Services.Llm.OllamaOptions>(builder.Configuration.GetSection("Ollama"));
 
-// Register LLM services
+// Register AI services (Microsoft.Extensions.AI-first, fallback to Ollama HTTP)
 builder.Services.AddSingleton<LucidForums.Services.Llm.IOllamaEndpointProvider, LucidForums.Services.Llm.OllamaEndpointProvider>();
 builder.Services.AddHttpClient("ollama", (sp, client) =>
 {
     var ep = sp.GetRequiredService<LucidForums.Services.Llm.IOllamaEndpointProvider>();
     client.BaseAddress = ep.GetBaseAddress();
 });
-builder.Services.AddSingleton<LucidForums.Services.Llm.IOllamaChatService, LucidForums.Services.Llm.OllamaChatService>();
+
+// Core AI layer
+builder.Services.AddSingleton<LucidForums.Services.Ai.ITextAiService, LucidForums.Services.Ai.TextAiService>();
+builder.Services.AddSingleton<LucidForums.Services.Ai.IImageAiService, LucidForums.Services.Ai.ImageAiService>();
+// Adapter for legacy IOllamaChatService usages
+builder.Services.AddSingleton<LucidForums.Services.Llm.IOllamaChatService, LucidForums.Services.Ai.OllamaChatAdapter>();
+
+// Moderation
 builder.Services.AddSingleton<LucidForums.Services.Moderation.IModerationService, LucidForums.Services.Moderation.ModerationService>();
 
 var app = builder.Build();

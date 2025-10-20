@@ -20,6 +20,7 @@
                 <ul class="menu menu-horizontal px-1">
                     <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
                     <li><a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a></li>
+                    <li><a asp-area="" asp-controller="Settings" asp-action="Index">Settings</a></li>
                 </ul>
                 <label class="swap swap-rotate">
                     <input type="checkbox" class="theme-controller" value="dark" />
@@ -64,6 +65,8 @@
         </div>
     </div>
 </footer>
+<script type="module" src="~/js/dist/runtime.js" asp-append-version="true"></script>
+<script type="module" src="~/js/dist/main.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

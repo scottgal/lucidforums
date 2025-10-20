@@ -1,0 +1,74 @@
+﻿@model LucidForums.Services.Llm.OllamaOptions
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Settings";
+}
+
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Settings</h1>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="text-lg font-semibold mb-2">AI / LLM</h2>
+            <div class="text-sm opacity-70 mb-3">
+                These settings are read from configuration (appsettings.json or environment variables). The current default model is shown below.
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 rounded-box border border-base-300">
+                    <div class="font-semibold mb-1">Current</div>
+                    <div class="text-sm">
+                        <div><span class="opacity-70">Endpoint:</span> @Model.Endpoint</div>
+                        <div><span class="opacity-70">Default model:</span> <code>@Model.DefaultModel</code></div>
+                        <div><span class="opacity-70">Temperature:</span> @Model.Temperature</div>
+                        <div><span class="opacity-70">Max tokens:</span> @Model.MaxTokens</div>
+                    </div>
+                </div>
+                <div class="p-4 rounded-box border border-base-300">
+                    <div class="font-semibold mb-1">How to change</div>
+                    <div class="text-sm">
+<pre class="whitespace-pre-wrap text-xs bg-base-200 p-3 rounded-box"><code>appsettings.json
+
+{
+  "Ollama": {
+    "Endpoint": "http://localhost:11434",
+    "DefaultModel": "llama3.1:8b-instruct-q4_K_M",
+    "Temperature": 0.2,
+    "MaxTokens": 512
+  }
+}</code></pre>
+                        <div class="opacity-70 mt-2">Or set environment variables, e.g. <code>Ollama__DefaultModel</code>.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <h3 class="text-md font-semibold mb-2">Recommended models</h3>
+                <div class="text-sm opacity-70 mb-3">Based on your hardware, here are sensible defaults that balance capability and speed when running via Ollama.</div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="p-4 rounded-box border border-base-300">
+                        <div class="font-semibold">GPU (16 GB VRAM)</div>
+                        <ul class="list-disc list-inside text-sm mt-2">
+                            <li><code>llama3.1:8b-instruct-q4_K_M</code> – strong general performance, fits comfortably on 16 GB VRAM at Q4; use <code>q5_K_M</code> if memory allows.</li>
+                            <li><code>qwen2.5:7b-instruct-q4_K_M</code> – very good quality and speed on consumer GPUs.</li>
+                            <li><code>gemma2:9b-instruct-q4_K_M</code> – capable alternative; may be a bit heavier.</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-4 rounded-box border border-base-300">
+                        <div class="font-semibold">CPU (Ryzen 9 9950X, 32 GB RAM)</div>
+                        <ul class="list-disc list-inside text-sm mt-2">
+                            <li><code>llama3.1:8b-instruct-q4_K_M</code> – solid quality; Q4 works well on high‑core CPUs, expect moderate speed.</li>
+                            <li><code>qwen2.5:7b-instruct-q4_K_M</code> – generally a fast, accurate choice for CPU inference.</li>
+                            <li><code>phi3:3.8b-mini-instruct-q4_K_M</code> – very fast on CPU for drafting and utility tasks; lower quality.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="alert mt-4">
+                    <span class="text-sm">Tip: After changing the default model, restart the app for configuration changes to take effect.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

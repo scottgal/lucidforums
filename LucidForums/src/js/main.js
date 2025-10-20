@@ -38,6 +38,7 @@ import utcdateDirective from './utcdate.js';
 import dynamicRowIds from "./dynamicRowIds";
 import preserveParams from './preserveParams.js';
 import './confirm'
+import './editor.js'
 // ======================
 // 4) INITIAL SETUP
 // ======================
