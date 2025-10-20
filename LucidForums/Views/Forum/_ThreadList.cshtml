@@ -1,0 +1,7 @@
+﻿@model IEnumerable<LucidForums.Models.ViewModels.ThreadSummaryVm>
+<ul class="space-y-2">
+@foreach (var t in Model)
+{
+    @await Html.PartialAsync("_ThreadListItem", t)
+}
+</ul>

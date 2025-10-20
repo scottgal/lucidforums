@@ -1,0 +1,18 @@
+﻿@model LucidForums.Models.ViewModels.ForumDetailsVm
+@{
+    ViewData["Title"] = Model.Name;
+}
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">@Model.Name</h1>
+    <button class="btn btn-primary"
+            hx-get="@Url.RouteUrl(new { controller = "Forum", action = "CreateThread", forumId = Model.Id })"
+            hx-target="#create-thread"
+            hx-swap="innerHTML">
+        New Thread
+    </button>
+</div>
+<p class="mb-6 text-gray-600">@Model.Description</p>
+<div id="create-thread"></div>
+<div id="thread-list">
+    @await Html.PartialAsync("_ThreadList", Model.Threads)
+</div>

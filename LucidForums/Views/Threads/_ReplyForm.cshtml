@@ -1,0 +1,14 @@
+﻿@model LucidForums.Models.ViewModels.ReplyVm
+<form method="post"
+      hx-post="@Url.Action("Reply", "Threads", new { id = Model.ThreadId })"
+      hx-target="#messages ul"
+      hx-swap="beforeend">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="ThreadId" />
+    <input type="hidden" asp-for="ParentId" />
+    <div class="mb-2">
+        <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="3" placeholder="Write a reply..."></textarea>
+        <span asp-validation-for="Content" class="text-red-600 text-sm"></span>
+    </div>
+    <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+</form>

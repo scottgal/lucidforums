@@ -1,0 +1,21 @@
+﻿@model LucidForums.Models.ViewModels.CreateThreadVm
+<form method="post"
+      hx-post="@Url.RouteUrl(new { controller = "Forum", action = "CreateThread", forumId = Model.ForumId })"
+      hx-target="#thread-list"
+      hx-swap="afterbegin">
+    @Html.AntiForgeryToken()
+    <div class="mb-2">
+        <label class="block text-sm font-medium">Title</label>
+        <input asp-for="Title" class="input input-bordered w-full" />
+        <span asp-validation-for="Title" class="text-red-600 text-sm"></span>
+    </div>
+    <div class="mb-2">
+        <label class="block text-sm font-medium">Content</label>
+        <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="5"></textarea>
+        <span asp-validation-for="Content" class="text-red-600 text-sm"></span>
+    </div>
+    <div class="flex gap-2">
+        <button type="submit" class="btn btn-primary">Create</button>
+        <button type="button" class="btn" onclick="document.getElementById('create-thread').innerHTML=''">Cancel</button>
+    </div>
+</form>

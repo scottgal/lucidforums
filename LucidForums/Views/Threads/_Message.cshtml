@@ -1,0 +1,12 @@
+﻿@model LucidForums.Models.ViewModels.MessageVm
+<li id="msg-@Model.Id" class="p-2 border rounded" style="margin-left:@(Model.Depth * 16)px">
+    <div class="prose max-w-none">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>") )</div>
+    <div class="text-xs text-gray-500 mt-1">@Model.CreatedAtUtc.ToString("g")</div>
+    <button class="btn btn-xs mt-2"
+            hx-get="@Url.Action("Reply", "Threads", new { id = ViewContext.RouteData.Values["id"], parentId = Model.Id })"
+            hx-target="#reply-form-@Model.Id"
+            hx-swap="innerHTML">
+        Reply
+    </button>
+    <div id="reply-form-@Model.Id"></div>
+</li>

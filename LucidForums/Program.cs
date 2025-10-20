@@ -6,10 +6,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Add EF Core + Identity (SQLite)
+// Add EF Core + Identity (PostgreSQL if provided; fallback to SQLite for local dev)
 builder.Services.AddDbContext<LucidForums.Data.ApplicationDbContext>(options =>
 {
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db");
+    var cs = builder.Configuration.GetConnectionString("Default")
+             ?? builder.Configuration["ConnectionStrings:Default"]
+             ?? builder.Configuration.GetConnectionString("DefaultConnection")
+             ?? "Data Source=app.db";
+
+    if (!string.IsNullOrWhiteSpace(cs) && cs.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseNpgsql(cs);
+    }
+    else
+    {
+        options.UseSqlite(cs);
+    }
 });
 
 builder.Services.AddIdentity<LucidForums.Models.Entities.User, Microsoft.AspNetCore.Identity.IdentityRole>(options =>
@@ -39,6 +51,26 @@ builder.Services.AddSingleton<LucidForums.Services.Llm.IOllamaChatService, Lucid
 
 // Moderation
 builder.Services.AddSingleton<LucidForums.Services.Moderation.IModerationService, LucidForums.Services.Moderation.ModerationService>();
+
+// Forum domain services
+builder.Services.AddScoped<LucidForums.Services.Forum.IForumService, LucidForums.Services.Forum.ForumService>();
+builder.Services.AddScoped<LucidForums.Services.Forum.IThreadService, LucidForums.Services.Forum.ThreadService>();
+builder.Services.AddScoped<LucidForums.Services.Forum.IMessageService, LucidForums.Services.Forum.MessageService>();
+builder.Services.AddScoped<LucidForums.Services.Forum.IThreadViewService, LucidForums.Services.Forum.ThreadViewService>();
+
+// Mapster (mapping) configuration
+LucidForums.Web.Mapping.MapsterRegistration.Register(Mapster.TypeAdapterConfig.GlobalSettings);
+// Register source-generated mapper via reflection to avoid compile-time dependency on generated type
+var mapperImpl = Type.GetType("LucidForums.Web.Mapping.AppMapper, LucidForums");
+if (mapperImpl is not null)
+{
+    builder.Services.AddSingleton(typeof(LucidForums.Web.Mapping.IAppMapper), mapperImpl);
+}
+else
+{
+    // Fallback: register a dummy that will throw at runtime if generator didn't run
+    builder.Services.AddSingleton<LucidForums.Web.Mapping.IAppMapper>(_ => throw new InvalidOperationException("Mapster source-generated mapper not found. Ensure Mapster.SourceGenerator is installed and the project is built."));
+}
 
 var app = builder.Build();
 

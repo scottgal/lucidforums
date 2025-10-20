@@ -1,0 +1,5 @@
+﻿@model LucidForums.Models.ViewModels.ThreadSummaryVm
+<li class="p-3 border rounded" id="thread-@Model.Id">
+    <a class="link link-primary" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@Model.Title</a>
+    <div class="text-xs text-gray-500">@Model.CreatedAtUtc.ToString("g")</div>
+</li>

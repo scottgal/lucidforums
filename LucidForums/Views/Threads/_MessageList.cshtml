@@ -1,0 +1,7 @@
+﻿@model IEnumerable<LucidForums.Models.ViewModels.MessageVm>
+<ul class="space-y-2">
+@foreach (var m in Model)
+{
+    @await Html.PartialAsync("_Message", m)
+}
+</ul>

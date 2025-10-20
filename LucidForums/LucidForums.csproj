@@ -15,8 +15,6 @@
 
     <ItemGroup>
       <Folder Include="Areas\Admin\" />
-      <Folder Include="Models\Dtos\" />
-      <Folder Include="Services\Forum\" />
     </ItemGroup>
 
     <ItemGroup>
@@ -35,6 +33,7 @@
       <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
       <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
       <PackageReference Include="Microsoft.Extensions.AI" Version="9.0.0" />
+      <PackageReference Include="Mapster" Version="7.4.0" />
     </ItemGroup>
 
 </Project>

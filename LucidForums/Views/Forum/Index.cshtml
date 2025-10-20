@@ -1,0 +1,14 @@
+﻿@model IEnumerable<LucidForums.Models.ViewModels.ForumListItemVm>
+@{
+    ViewData["Title"] = "Forums";
+}
+<h1 class="text-2xl font-bold mb-4">Forums</h1>
+<ul class="space-y-2">
+@foreach (var f in Model)
+{
+    <li class="p-3 border rounded">
+        <a class="link link-primary" href="@Url.Action("Details", "Forum", new { slug = f.Slug })">@f.Name</a>
+        <div class="text-sm text-gray-600">@f.Description</div>
+    </li>
+}
+</ul>

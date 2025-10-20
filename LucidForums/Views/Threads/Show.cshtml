@@ -1,0 +1,11 @@
+﻿@model LucidForums.Models.ViewModels.ThreadVm
+@{
+    ViewData["Title"] = Model.Title;
+}
+<h1 class="text-2xl font-bold mb-4">@Model.Title</h1>
+<div id="messages">
+    @await Html.PartialAsync("_MessageList", Model.Messages)
+</div>
+<div class="mt-4">
+    @await Html.PartialAsync("_ReplyForm", new LucidForums.Models.ViewModels.ReplyVm { ThreadId = Model.Id })
+</div>
