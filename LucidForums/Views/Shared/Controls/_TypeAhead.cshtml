@@ -1,0 +1,66 @@
+﻿@model LucidForums.Models.ViewModels.Controls.TypeaheadModel
+
+<div
+    x-data="typeahead($el.dataset)"
+    x-on:click.outside="results = []"
+    x-cloak
+    hx-indicator
+    class="relative w-full"
+    id="@Model.SearchElementId"
+    data-search-endpoint="@Model.SearchEndpoint"
+    data-search-element-id="@Model.SearchElementId"
+    data-htmx-endpoint="@Model.HtmxEndpoint"
+    data-htmx-target="@Model.HtmxTarget"
+    data-redirect-url="@Model.RedirectUrl"
+>
+
+    <!-- Input Box -->
+    <label class="input h-8 bg-neutral-200 dark:bg-neutral-700 bg-opacity-20 input-bordered flex items-center gap-1 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-primary transition w-full pl-0 pr-2 overflow-hidden">
+        <!-- Left search button/icon -->
+        <button type="button"
+                class="btn btn-square btn-ghost h-8 min-h-0 rounded-l-lg rounded-r-none"
+                :class="(!query || query.trim().length === 0 || loading) ? 'btn-ghost text-gray-500 dark:text-gray-400' : 'btn-primary text-white'"
+                x-on:click.prevent="$data.submitQuery()"
+                :disabled="!query || query.trim().length === 0 || loading"
+                aria-label="Search">
+            <i class="bx bx-search text-base"></i>
+        </button>
+        <span class="loading loading-spinner loading-sm text-gray-500 dark:text-gray-400" x-show="loading"></span>
+        <input
+            type="text"
+            class="h-full border-0 grow text-sm text-gray-900 dark:text-white bg-transparent focus:outline-none w-full placeholder-gray-500 dark:placeholder-gray-400"
+            placeholder="@Model.PlaceHolder"
+            x-model="query"
+            x-on:input.debounce.200ms="$data.search()"
+            x-on:keydown.down.prevent="moveDown"
+            x-on:keydown.up.prevent="moveUp"
+            x-on:keydown.enter.prevent="$data.onEnter()"
+            value="@Model.Value"
+        />
+    </label>
+
+    <!-- Results Dropdown -->
+    <template x-if="results?.length > 0 && query.length > 2">
+        <ul
+            id="@Model.SearchElementId-results"
+            class="absolute left-0 w-full bg-white dark:bg-neutral-800 z-[999] border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-lg max-h-60 overflow-auto mt-1"
+            x-cloak
+        >
+            <template x-for="(result, index) in results" :key="result.id">
+                <li
+                    x-on:click.prevent="$data.selectResult(index)"
+                    hx-boost="true"
+                    hx-swap="show:window:top"
+                    hx-target="#contentcontainer"
+                    :class="{
+                        'dark:bg-blue-700 bg-blue-100 text-white': index === highlightedIndex,
+                        'hover:bg-gray-100 dark:hover:bg-neutral-700': index !== highlightedIndex
+                    }"
+                    class="cursor-pointer text-base px-4 py-3"
+                >
+                    <a :href="result.url" x-text="result.description" class="block truncate font-medium"></a>
+                </li>
+            </template>
+        </ul>
+    </template>
+</div>

@@ -1,0 +1,23 @@
+﻿@model LucidForums.Models.ViewModels.Controls.SearchElementModel
+
+
+<div class="relative  w-full" id="@Model.Id" >
+    <label class="input input-sm bg-neutral-200 dark:bg-neutral-700 bg-opacity-20 input-bordered flex items-center gap-1 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-primary w-full">
+        <i class="bx bx-search text-gray-500 dark:text-gray-400 text-lg"></i>
+        <input
+            type="text"
+            placeholder="@Model.Placeholder"
+            class="border-0 grow input-sm text-gray-900 dark:text-white bg-transparent focus:outline-none w-full placeholder-gray-500 dark:placeholder-gray-400"
+            hx-get
+            hx-push-url="true"
+            hx-controller="@Model.Controller"
+            hx-action="@Model.Action"
+            name="@Model.Name"
+            hx-headers='@Html.Raw("{\"searchElement\":\"true\"}")'
+            hx-trigger="keyup[target.value.length > 2] delay:300ms"
+            hx-target="#@Model.Target"
+            hx-indicator
+            hx-params="*"
+        />
+    </label>
+</div>

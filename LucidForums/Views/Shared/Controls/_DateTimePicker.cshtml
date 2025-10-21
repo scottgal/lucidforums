@@ -1,0 +1,57 @@
+﻿@model LucidForums.Models.ViewModels.Controls.DateTimePickerModel
+@{
+    var isoUtcDate = Model.SelectedDateTime?.ToString("o");
+}
+
+<div
+    x-data="{
+        initFlatpickr() {
+            const initial = this.$refs.hidden.value;
+            const fp = flatpickr(this.$refs.wrapper, {
+                wrap: true,
+                enableTime: true,
+                dateFormat: 'd/m/Y H:i',
+                time_24hr: true
+            });
+
+            if (initial) {
+                fp.setDate(initial, false);
+            }
+
+            // Keep hidden input in sync with selected date (UTC)
+            this.$refs.wrapper._flatpickr.config.onChange.push((dates) => {
+                if (dates.length) {
+                    this.$refs.hidden.value = dates[0].toISOString();
+                } else {
+                    this.$refs.hidden.value = '';
+                }
+            });
+        }
+    }"
+    x-init="initFlatpickr()"
+    x-ref="wrapper"
+    class="w-full max-w-xs space-y-1"
+>
+    <label
+        data-wrap
+        class="input input-sm bg-neutral-200 dark:bg-neutral-700 input-bordered flex items-center gap-2 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-primary transition w-full"
+    >
+        <i data-toggle class="bx bx-calendar text-gray-500 dark:text-gray-400 text-lg cursor-pointer"></i>
+        
+        <input
+            data-input
+            x-ref="display"
+            type="text"
+            placeholder="@Model.Placeholder"
+            class="border-0 grow input-sm text-gray-900 dark:text-white bg-transparent focus:outline-none w-full placeholder-gray-500 dark:placeholder-gray-400"
+        />
+
+        <input
+            x-ref="hidden"
+            type="hidden"
+            class="hidden"
+            name="@Model.ElementId"
+            value="@isoUtcDate"
+        />
+    </label>
+</div>
