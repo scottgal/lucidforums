@@ -21,7 +21,7 @@ public class EmbeddingOptions : IConfigSection
     public string? Endpoint { get; set; }
 }
 
-public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> options, Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> aiOptions, IServiceProvider serviceProvider) : IEmbeddingService
+public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> options, Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> aiOptions, IServiceProvider serviceProvider, LucidForums.Services.Ai.IAiSettingsService aiSettings) : IEmbeddingService
 {
     private readonly ApplicationDbContext _db = db;
     private readonly IHttpClientFactory _httpFactory = httpFactory;
@@ -33,8 +33,11 @@ public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFa
     public async Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
         var opts = _embOptions.CurrentValue;
-        var model = string.IsNullOrWhiteSpace(opts.Model) ? "mxbai-embed-large" : opts.Model!;
-        var provider = (opts.Provider ?? "ollama").Trim().ToLowerInvariant();
+        var settings = aiSettings;
+        var model = string.IsNullOrWhiteSpace(settings.EmbeddingModel)
+            ? (string.IsNullOrWhiteSpace(opts.Model) ? "mxbai-embed-large" : opts.Model!)
+            : settings.EmbeddingModel!;
+        var provider = (settings.EmbeddingProvider ?? opts.Provider ?? "ollama").Trim().ToLowerInvariant();
 
         // Prefer Microsoft.Extensions.AI embedding generator if available (for OpenAI-compatible providers like LM Studio/OpenAI)
         var genObj = _sp.GetService(typeof(IEmbeddingGenerator<string, Embedding<float>>));

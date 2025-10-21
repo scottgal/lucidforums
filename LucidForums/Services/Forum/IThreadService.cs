@@ -22,18 +22,30 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db) : IThreadSe
 
     public async Task<ForumThread> CreateAsync(Guid forumId, string title, string content, string? authorId, CancellationToken ct = default)
     {
+        // Validate author exists; otherwise use null to avoid FK violations
+        string? validAuthorId = null;
+        if (!string.IsNullOrWhiteSpace(authorId))
+        {
+            try
+            {
+                bool exists = await db.Users.AsNoTracking().AnyAsync(u => u.Id == authorId, ct);
+                if (exists) validAuthorId = authorId;
+            }
+            catch { }
+        }
+
         var thread = new ForumThread
         {
             ForumId = forumId,
             Title = title,
-            CreatedById = authorId,
+            CreatedById = validAuthorId,
             CreatedAtUtc = DateTime.UtcNow
         };
         var root = new Message
         {
             Thread = thread,
             Content = content,
-            CreatedById = authorId,
+            CreatedById = validAuthorId,
             CreatedAtUtc = DateTime.UtcNow,
             Path = null,
         };

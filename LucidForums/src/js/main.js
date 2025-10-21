@@ -39,6 +39,10 @@ import dynamicRowIds from "./dynamicRowIds";
 import preserveParams from './preserveParams.js';
 import './confirm'
 import './editor.js'
+// Page-specific behaviors
+import './pages/admin-ai-settings.js'
+import './pages/admin-ai-test.js'
+import './pages/setup.js'
 // ======================
 // 4) INITIAL SETUP
 // ======================

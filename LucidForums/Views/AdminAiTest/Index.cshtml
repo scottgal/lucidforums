@@ -2,12 +2,16 @@
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
-<div class="prose max-w-none">
+<div class="prose-header">
     <h1>Admin AI Test</h1>
     <p class="text-base-content/70">Use this page to test AI interactions with charters and forum thread context.</p>
+    <p class="link-row">
+        <a class="link link-primary" href="/Admin/AiSettings">Go to AI Settings</a>
+        <a class="btn btn-sm btn-accent" href="/Setup" title="Use AI to generate realistic sample content">Populate the site</a>
+    </p>
 </div>
 
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+<div class="grid-2col-xl">
     <div class="card bg-base-100 shadow">
         <div class="card-body">
             <h2 class="card-title">Run Prompt Against Charter</h2>
@@ -15,7 +19,7 @@
                 @Html.AntiForgeryToken()
                 <div class="form-control">
                     <label class="label">Charter</label>
-                    <select name="CharterId" class="select select-bordered w-full max-w-xl">
+                    <select name="CharterId" class="select-md">
                         <option value="">(Default: General Assistant)</option>
                         @foreach (var c in Model.CharterOptions)
                         {
@@ -24,14 +28,29 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Model (optional)</label>
-                    <input name="ModelName" value="@Model.ModelName" class="input input-bordered w-full max-w-xl" placeholder="e.g. llama3.1:8b or leave blank" />
+                    <label class="label">Provider</label>
+                    <select name="ProviderName" id="providerSelect" class="select-md">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.SelectedProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="ModelName" id="modelSelect" class="select-md">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.Models)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
                 </div>
                 <div class="form-control mt-3">
                     <label class="label">Prompt</label>
-                    <textarea name="Prompt" class="textarea textarea-bordered w-full h-40" placeholder="Type your prompt here...">@Model.Prompt</textarea>
+                    <textarea name="Prompt" class="textarea-lg" placeholder="Type your prompt here...">@Model.Prompt</textarea>
                 </div>
-                <div class="mt-4">
+                <div class="action-row">
                     <button class="btn btn-primary" type="submit">Run</button>
                 </div>
             </form>
@@ -39,7 +58,53 @@
             {
                 <div class="mt-4">
                     <div class="label">Output</div>
-                    <pre class="whitespace-pre-wrap bg-base-200 p-4 rounded">@Model.Output</pre>
+                    <pre class="code-pre">@Model.Output</pre>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Translate Text</h2>
+            <form method="post" asp-action="Translate">
+                @Html.AntiForgeryToken()
+                <div class="form-control">
+                    <label class="label">Provider</label>
+                    <select name="ProviderName" id="providerSelect2" class="select-md">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.SelectedProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="ModelName" id="modelSelect2" class="select-md">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.Models)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Target Language</label>
+                    <input name="TargetLanguage" value="@Model.TranslateTarget" class="input-md" placeholder="e.g. Spanish, German, French" />
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Text</label>
+                    <textarea name="Text" class="textarea-md" placeholder="Type or paste text to translate...">@Model.TranslateText</textarea>
+                </div>
+                <div class="action-row">
+                    <button class="btn" type="submit">Translate</button>
+                </div>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.TranslateOutput))
+            {
+                <div class="mt-4">
+                    <div class="label">Translated Output</div>
+                    <pre class="code-pre">@Model.TranslateOutput</pre>
                 </div>
             }
         </div>
@@ -52,7 +117,7 @@
                 @Html.AntiForgeryToken()
                 <div class="form-control">
                     <label class="label">Thread Id</label>
-                    <input name="ThreadId" value="@Model.ThreadId" class="input input-bordered w-full max-w-xl" placeholder="Paste a Thread GUID" />
+                    <input name="ThreadId" value="@Model.ThreadId" class="input-md" placeholder="Paste a Thread GUID" />
                 </div>
                 <div class="form-control mt-3">
                     <label class="label">Context Messages</label>
@@ -60,7 +125,7 @@
                 </div>
                 <div class="form-control mt-3">
                     <label class="label">Charter (optional)</label>
-                    <select name="CharterId" class="select select-bordered w-full max-w-xl">
+                    <select name="CharterId" class="select-md">
                         <option value="">(Default: Forum Reply Assistant)</option>
                         @foreach (var c in Model.CharterOptions)
                         {
@@ -70,9 +135,9 @@
                 </div>
                 <div class="form-control mt-3">
                     <label class="label">Additional Instruction (optional)</label>
-                    <textarea name="Prompt" class="textarea textarea-bordered w-full h-32" placeholder="Optional guidance to the assistant...">@Model.Prompt</textarea>
+                    <textarea name="Prompt" class="textarea-md" placeholder="Optional guidance to the assistant...">@Model.Prompt</textarea>
                 </div>
-                <div class="mt-4">
+                <div class="action-row">
                     <button class="btn" type="submit">Suggest Reply</button>
                 </div>
             </form>
@@ -80,7 +145,36 @@
             {
                 <div class="mt-4">
                     <div class="label">Suggested Reply</div>
-                    <pre class="whitespace-pre-wrap bg-base-200 p-4 rounded">@Model.ReplySuggestion</pre>
+                    <pre class="code-pre">@Model.ReplySuggestion</pre>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Test Embeddings</h2>
+            <div class="text-sm opacity-70">Uses current embedding settings. Provider: <code>@Model.CurrentEmbeddingProvider</code>, Model: <code>@Model.CurrentEmbeddingModel</code></div>
+            <form method="post" asp-action="Embed">
+                @Html.AntiForgeryToken()
+                <div class="form-control mt-3">
+                    <label class="label">Text to Embed</label>
+                    <textarea name="Text" class="textarea-md" placeholder="Type text to embed...">@Model.EmbedText</textarea>
+                </div>
+                <div class="action-row">
+                    <button class="btn" type="submit">Embed</button>
+                    <a class="btn btn-ghost" href="/Admin/AiSettings">Adjust Embedding Settings</a>
+                </div>
+            </form>
+            @if (Model.EmbedDimensions.HasValue)
+            {
+                <div class="mt-4">
+                    <div class="label">Result</div>
+                    <div class="text-sm">Dimensions: <span class="font-mono">@Model.EmbedDimensions</span></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.EmbedPreview))
+                    {
+                        <div class="text-sm mt-2">Preview: <code>@Model.EmbedPreview</code></div>
+                    }
                 </div>
             }
         </div>

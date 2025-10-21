@@ -19,12 +19,27 @@ public class ForumService(LucidForums.Data.ApplicationDbContext db) : IForumServ
 
     public async Task<LucidForums.Models.Entities.Forum> CreateAsync(string name, string slug, string? description, string? createdById, CancellationToken ct = default)
     {
+        // Validate creator exists; otherwise, leave null to avoid FK violations
+        string? validCreatorId = null;
+        if (!string.IsNullOrWhiteSpace(createdById))
+        {
+            try
+            {
+                bool exists = await db.Users.AsNoTracking().AnyAsync(u => u.Id == createdById, ct);
+                if (exists) validCreatorId = createdById;
+            }
+            catch
+            {
+                // In case of provider limitations or errors, fallback to null
+            }
+        }
+
         var forum = new LucidForums.Models.Entities.Forum
         {
             Name = name,
             Slug = slug,
             Description = description,
-            CreatedById = createdById,
+            CreatedById = validCreatorId,
             CreatedAtUtc = DateTime.UtcNow
         };
         db.Forums.Add(forum);

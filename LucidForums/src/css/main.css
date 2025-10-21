@@ -52,3 +52,27 @@
 
 
 [x-cloak] { display: none !important; }
+@layer components {
+    /* Panels */
+    .panel-card { @apply card bg-base-100 shadow; }
+    .panel-body { @apply card-body; }
+
+    /* Grid helpers */
+    .grid-2col-xl { @apply grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6; }
+    .grid-3col-lg { @apply grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6; }
+
+    /* Form field helpers */
+    .field-first { @apply form-control; }
+    .field { @apply form-control mt-3; }
+    .field-label { @apply label; }
+    .input-md { @apply input input-bordered w-full max-w-xl; }
+    .select-md { @apply select select-bordered w-full max-w-xl; }
+    .textarea-md { @apply textarea textarea-bordered w-full h-32; }
+    .textarea-lg { @apply textarea textarea-bordered w-full h-40; }
+
+    /* Content helpers */
+    .code-pre { @apply whitespace-pre-wrap bg-base-200 p-4 rounded; }
+    .prose-header { @apply prose max-w-none; }
+    .link-row { @apply mt-2 flex gap-4 flex-wrap; }
+    .action-row { @apply mt-4; }
+}

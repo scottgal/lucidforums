@@ -30,6 +30,50 @@ public class ForumController(IForumService forumService, IThreadService threadSe
     }
 
     [HttpGet]
+    [Route("Forum/Create")]
+    public IActionResult Create()
+    {
+        return View(new CreateForumVm());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Route("Forum/Create")]
+    public async Task<IActionResult> Create(CreateForumVm vm, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            Response.StatusCode = 400;
+            return View(vm);
+        }
+        var slug = string.IsNullOrWhiteSpace(vm.Slug) ? Slugify(vm.Name) : vm.Slug!.Trim().ToLowerInvariant();
+        // naive uniqueness: append suffix until unique
+        var baseSlug = slug;
+        int i = 1;
+        while (await forumService.GetBySlugAsync(slug, ct) != null)
+        {
+            slug = baseSlug + "-" + i++;
+        }
+        var forum = await forumService.CreateAsync(vm.Name.Trim(), slug, vm.Description, User?.Identity?.Name, ct);
+        return RedirectToAction("Details", new { slug = forum.Slug });
+    }
+
+    private static string Slugify(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "forum";
+        var s = input.Trim().ToLowerInvariant();
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (var ch in s)
+        {
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) sb.Append(ch);
+            else if (char.IsWhiteSpace(ch) || ch == '_' || ch == '-') sb.Append('-');
+        }
+        var slug = sb.ToString().Trim('-');
+        while (slug.Contains("--")) slug = slug.Replace("--", "-");
+        return string.IsNullOrWhiteSpace(slug) ? "forum" : slug;
+    }
+
+    [HttpGet]
     [Route("Forum/{forumId:guid}/CreateThread")]
     public IActionResult CreateThread(Guid forumId)
     {

@@ -1,0 +1,28 @@
+﻿@model LucidForums.Models.ViewModels.CreateForumVm
+@{
+    ViewData["Title"] = "Create Forum";
+}
+<h1 class="text-2xl font-bold mb-4">Create Forum</h1>
+<form method="post" action="/Forum/Create" class="space-y-4 max-w-xl">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="All" class="text-red-600"></div>
+    <div>
+        <label class="block text-sm font-medium">Name</label>
+        <input asp-for="Name" class="input input-bordered w-full" />
+        <span asp-validation-for="Name" class="text-red-600 text-sm"></span>
+    </div>
+    <div>
+        <label class="block text-sm font-medium">Description</label>
+        <input asp-for="Description" class="input input-bordered w-full" />
+        <span asp-validation-for="Description" class="text-red-600 text-sm"></span>
+    </div>
+    <div>
+        <label class="block text-sm font-medium">Slug (optional)</label>
+        <input asp-for="Slug" class="input input-bordered w-full" placeholder="auto-generated if left blank" />
+        <span asp-validation-for="Slug" class="text-red-600 text-sm"></span>
+    </div>
+    <div class="flex gap-2">
+        <button class="btn btn-primary" type="submit">Create</button>
+        <a class="btn" href="@Url.Action("Index", "Forum")">Cancel</a>
+    </div>
+</form>

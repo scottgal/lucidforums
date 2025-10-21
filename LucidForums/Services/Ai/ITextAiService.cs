@@ -22,4 +22,9 @@ public interface ITextAiService
     /// Implementations may fall back to chunking a full translation if streaming is not supported.
     /// </summary>
     Task TranslateStreamAsync(string text, string targetLanguage, Func<string, Task> onChunk, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the list of model IDs available from the currently configured provider.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default);
 }

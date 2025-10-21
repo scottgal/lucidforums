@@ -197,4 +197,42 @@ public class LmStudioChatProvider : IChatProvider
             throw;
         }
     }
+    public async Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct)
+    {
+        var tcfg = _telemetryOptions.CurrentValue;
+        using var activity = _telemetry.StartActivity("LmStudio.ListModels", ActivityKind.Client, a =>
+        {
+            a?.SetTag(tcfg.Tags.System, "lmstudio");
+        });
+        try
+        {
+            var client = _httpClientFactory.CreateClient("ollama"); // absolute URI
+            using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(GetBaseUri(), "/v1/models"));
+            using var resp = await client.SendAsync(req, ct);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var list = new List<string>();
+            if (doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in data.EnumerateArray())
+                {
+                    if (m.TryGetProperty("id", out var idEl))
+                    {
+                        var id = idEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(id)) list.Add(id);
+                    }
+                }
+            }
+            return list;
+        }
+        catch (Exception ex)
+        {
+            var tags = _telemetryOptions.CurrentValue.Tags;
+            activity?.SetTag(tags.Error, true);
+            activity?.SetTag(tags.ExceptionType, ex.GetType().FullName);
+            activity?.SetTag(tags.ExceptionMessage, ex.Message);
+            throw;
+        }
+    }
 }

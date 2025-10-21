@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Linq;
 using LucidForums.Services.Ai;
 using LucidForums.Services.Charters;
 using LucidForums.Services.Forum;
@@ -8,19 +9,32 @@ namespace LucidForums.Controllers;
 
 // Simple admin AI test surface. If your app has authorization/roles, consider decorating with [Authorize(Roles="Admin")]
 [Route("Admin/AiTest")] 
-public class AdminAiTestController(ITextAiService ai, ICharterService charters, IThreadViewService threadViews) : Controller
+public class AdminAiTestController(ITextAiService ai, ICharterService charters, IThreadViewService threadViews, IEnumerable<IChatProvider> chatProviders, IAiSettingsService aiSettings, LucidForums.Services.Search.IEmbeddingService embeddings) : Controller
 {
     public class IndexVm
     {
         public List<LucidForums.Models.Entities.Charter> CharterOptions { get; set; } = new();
         public Guid? SelectedCharterId { get; set; }
+        public List<string> Providers { get; set; } = new();
+        public string? SelectedProvider { get; set; }
+        public List<string> Models { get; set; } = new();
         public string? ModelName { get; set; }
         public string? Prompt { get; set; }
         public string? Output { get; set; }
+        // Translation fields
+        public string? TranslateText { get; set; }
+        public string? TranslateTarget { get; set; }
+        public string? TranslateOutput { get; set; }
         // Optional context for reply simulation
         public Guid? ThreadId { get; set; }
         public int ContextMessageLimit { get; set; } = 5;
         public string? ReplySuggestion { get; set; }
+        // Embedding test fields
+        public string? EmbedText { get; set; }
+        public int? EmbedDimensions { get; set; }
+        public string? EmbedPreview { get; set; }
+        public string? CurrentEmbeddingProvider { get; set; }
+        public string? CurrentEmbeddingModel { get; set; }
         public string? Error { get; set; }
     }
 
@@ -28,27 +42,70 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
     [Route("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var vm = new IndexVm
+        var providers = chatProviders.Select(p => p.Name).ToList();
+        // Prefer saved settings
+        var selectedProvider = aiSettings.GenerationProvider;
+        if (string.IsNullOrWhiteSpace(selectedProvider)) selectedProvider = providers.FirstOrDefault();
+        var models = new List<string>();
+        if (!string.IsNullOrWhiteSpace(selectedProvider))
         {
-            CharterOptions = await charters.ListAsync(ct)
-        };
+            var prov = chatProviders.First(p => string.Equals(p.Name, selectedProvider, StringComparison.OrdinalIgnoreCase));
+            var list = await prov.ListModelsAsync(ct);
+            models = list.ToList();
+        }
+        var vm = new IndexVm
+            {
+                CharterOptions = await charters.ListAsync(ct),
+                Providers = providers,
+                SelectedProvider = selectedProvider,
+                ModelName = aiSettings.GenerationModel,
+                Models = models,
+                CurrentEmbeddingProvider = aiSettings.EmbeddingProvider,
+                CurrentEmbeddingModel = aiSettings.EmbeddingModel
+            };
         ViewData["Title"] = "Admin • AI Test";
         return View(vm);
     }
 
-    public record RunRequest(Guid? CharterId, string? Prompt, string? ModelName);
+    [HttpGet]
+    [Route("Models")]
+    public async Task<IActionResult> Models([FromQuery] string provider, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(provider)) return BadRequest("provider is required");
+        var prov = chatProviders.FirstOrDefault(p => string.Equals(p.Name, provider, StringComparison.OrdinalIgnoreCase));
+        if (prov == null) return NotFound();
+        var models = await prov.ListModelsAsync(ct);
+        return Ok(models);
+    }
+
+    public record RunRequest(Guid? CharterId, string? Prompt, string? ModelName, string? ProviderName);
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Route("Run")]
     public async Task<IActionResult> Run([FromForm] RunRequest req, CancellationToken ct)
     {
+        var providers = chatProviders.Select(p => p.Name).ToList();
+        var selectedProvider = string.IsNullOrWhiteSpace(req.ProviderName) ? (aiSettings.GenerationProvider ?? providers.FirstOrDefault()) : req.ProviderName;
+        var prov = !string.IsNullOrWhiteSpace(selectedProvider)
+            ? chatProviders.FirstOrDefault(p => string.Equals(p.Name, selectedProvider, StringComparison.OrdinalIgnoreCase))
+            : null;
+        var models = new List<string>();
+        if (prov != null)
+        {
+            models = (await prov.ListModelsAsync(ct)).ToList();
+        }
         var vm = new IndexVm
         {
             CharterOptions = await charters.ListAsync(ct),
             SelectedCharterId = req.CharterId,
             Prompt = req.Prompt,
-            ModelName = req.ModelName
+            ModelName = string.IsNullOrWhiteSpace(req.ModelName) ? aiSettings.GenerationModel : req.ModelName,
+            Providers = providers,
+            SelectedProvider = selectedProvider,
+            Models = models,
+            CurrentEmbeddingProvider = aiSettings.EmbeddingProvider,
+            CurrentEmbeddingModel = aiSettings.EmbeddingModel
         };
 
         if (string.IsNullOrWhiteSpace(req.Prompt))
@@ -68,11 +125,73 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
             Purpose = "Be a concise, helpful assistant for forum admins testing AI behavior."
         };
 
-        vm.Output = await ai.GenerateAsync(charter!, req.Prompt!, req.ModelName, ct);
+        if (prov == null)
+        {
+            vm.Error = "Selected provider not found.";
+            Response.StatusCode = 400;
+            return View("Index", vm);
+        }
+
+        vm.Output = await prov.GenerateAsync(charter!, req.Prompt!, req.ModelName, null, null, ct);
         return View("Index", vm);
     }
 
     public record ReplyRequest(Guid? ThreadId, int? ContextMessageLimit, string? Prompt, Guid? CharterId);
+
+    public record TranslateRequest(string? Text, string? TargetLanguage, string? ModelName, string? ProviderName);
+
+    public record EmbedRequest(string? Text);
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Route("Translate")]
+    public async Task<IActionResult> Translate([FromForm] TranslateRequest req, CancellationToken ct)
+    {
+        var providers = chatProviders.Select(p => p.Name).ToList();
+        var selectedProvider = string.IsNullOrWhiteSpace(req.ProviderName) ? (aiSettings.TranslationProvider ?? providers.FirstOrDefault()) : req.ProviderName;
+        var prov = !string.IsNullOrWhiteSpace(selectedProvider)
+            ? chatProviders.FirstOrDefault(p => string.Equals(p.Name, selectedProvider, StringComparison.OrdinalIgnoreCase))
+            : null;
+        var models = new List<string>();
+        if (prov != null)
+        {
+            models = (await prov.ListModelsAsync(ct)).ToList();
+        }
+        var vm = new IndexVm
+        {
+            CharterOptions = await charters.ListAsync(ct),
+            Providers = providers,
+            SelectedProvider = selectedProvider,
+            Models = models,
+            TranslateText = req.Text,
+            TranslateTarget = req.TargetLanguage,
+            ModelName = string.IsNullOrWhiteSpace(req.ModelName) ? aiSettings.TranslationModel : req.ModelName,
+            CurrentEmbeddingProvider = aiSettings.EmbeddingProvider,
+            CurrentEmbeddingModel = aiSettings.EmbeddingModel
+        };
+
+        if (string.IsNullOrWhiteSpace(req.Text))
+        {
+            vm.Error = "Please enter text to translate.";
+            Response.StatusCode = 400;
+            return View("Index", vm);
+        }
+        if (string.IsNullOrWhiteSpace(req.TargetLanguage))
+        {
+            vm.Error = "Please specify a target language (e.g., 'Spanish').";
+            Response.StatusCode = 400;
+            return View("Index", vm);
+        }
+        if (prov == null)
+        {
+            vm.Error = "Selected provider not found.";
+            Response.StatusCode = 400;
+            return View("Index", vm);
+        }
+
+        vm.TranslateOutput = await prov.TranslateAsync(req.Text!, req.TargetLanguage!, req.ModelName, null, null, ct);
+        return View("Index", vm);
+    }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -132,6 +251,42 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
             };
 
         vm.ReplySuggestion = await ai.GenerateAsync(charter!, sb.ToString(), null, ct);
+        return View("Index", vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Route("Embed")]
+    public async Task<IActionResult> Embed([FromForm] EmbedRequest req, CancellationToken ct)
+    {
+        var vm = new IndexVm
+        {
+            CharterOptions = await charters.ListAsync(ct),
+            EmbedText = req.Text,
+            CurrentEmbeddingProvider = aiSettings.EmbeddingProvider,
+            CurrentEmbeddingModel = aiSettings.EmbeddingModel
+        };
+        if (string.IsNullOrWhiteSpace(req.Text))
+        {
+            vm.Error = "Please enter text to embed.";
+            Response.StatusCode = 400;
+            return View("Index", vm);
+        }
+        try
+        {
+            var vec = await embeddings.EmbedAsync(req.Text!, ct);
+            vm.EmbedDimensions = vec?.Length;
+            if (vec != null && vec.Length > 0)
+            {
+                var take = Math.Min(12, vec.Length);
+                vm.EmbedPreview = string.Join(", ", vec.Take(take).Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + (vec.Length > take ? ", ..." : "");
+            }
+        }
+        catch (Exception ex)
+        {
+            vm.Error = $"Embedding failed: {ex.Message}";
+            Response.StatusCode = 500;
+        }
         return View("Index", vm);
     }
 }

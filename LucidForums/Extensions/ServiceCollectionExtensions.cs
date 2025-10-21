@@ -1,52 +1,68 @@
-﻿using LucidForums.Helpers;
+﻿using LucidForums.Data;
+using LucidForums.Helpers;
+using LucidForums.Models.Entities;
+using LucidForums.Services.Ai;
+using LucidForums.Services.Ai.Providers;
 using LucidForums.Services.Charters;
+using LucidForums.Services.Forum;
 using LucidForums.Services.Llm;
+using LucidForums.Services.Moderation;
+using LucidForums.Services.Observability;
+using LucidForums.Services.Search;
+using LucidForums.Services.Seeding;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Resources;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace LucidForums.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddLucidForumsConfiguration(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLucidForumsConfiguration(this IServiceCollection services,
+        IConfiguration configuration)
     {
         // Bind config using project helpers (choose reloadable vs static)
-        services.ConfigureScopedPOCOFromMonitor<LucidForums.Services.Ai.AiOptions>(configuration); // reloadable
-        services.ConfigurePOCO<LucidForums.Services.Llm.OllamaOptions>(configuration); // static singleton
-        services.ConfigureScopedPOCOFromMonitor<LucidForums.Services.Search.EmbeddingOptions>(configuration); // reloadable
-        services.Configure<LucidForums.Services.Search.EmbeddingOptions>(configuration.GetSection("Embedding"));
+        services.ConfigureScopedPOCOFromMonitor<AiOptions>(configuration); // reloadable
+        services.ConfigurePOCO<OllamaOptions>(configuration); // static singleton
+        services.ConfigureScopedPOCOFromMonitor<EmbeddingOptions>(configuration); // reloadable
+        services.Configure<EmbeddingOptions>(configuration.GetSection("Embedding"));
         // Telemetry config (names, tags, paths)
-        services.ConfigurePOCO<LucidForums.Services.Observability.TelemetryOptions>(configuration);
+        services.ConfigurePOCO<TelemetryOptions>(configuration);
         return services;
     }
 
-    public static IServiceCollection AddLucidForumsDatabase(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLucidForumsDatabase(this IServiceCollection services,
+        IConfiguration configuration)
     {
-        services.AddDbContext<LucidForums.Data.ApplicationDbContext>(options =>
+        services.AddDbContext<ApplicationDbContext>(options =>
         {
             var cs = configuration.GetConnectionString("Default")
                      ?? configuration["ConnectionStrings:Default"]
-                     ?? configuration.GetConnectionString("DefaultConnection")
-                     ?? "Data Source=app.db";
+                     ?? configuration.GetConnectionString("DefaultConnection");
 
-            if (!string.IsNullOrWhiteSpace(cs) && cs.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(cs))
             {
-                options.UseNpgsql(cs);
+                throw new InvalidOperationException("Database connection string not found. Please set 'ConnectionStrings:Default' in appsettings or user-secrets.");
             }
-            else
+
+            var csNorm = cs.Trim();
+            var upper = csNorm.ToUpperInvariant();
+
+            // Guard: reject SQLite-style connection strings (ltree and vector require PostgreSQL)
+            bool looksLikeSqlite = upper.Contains("DATA SOURCE=") || csNorm.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || csNorm.EndsWith(".sqlite", StringComparison.OrdinalIgnoreCase);
+            if (looksLikeSqlite)
             {
-                options.UseSqlite(cs);
+                throw new InvalidOperationException("SQLite is not supported. Please provide a PostgreSQL connection string (e.g., Host=localhost;Port=5432;Database=...;Username=...;Password=...).");
             }
+
+            // Always use PostgreSQL (Npgsql)
+            options.UseNpgsql(cs);
         });
 
-        services.AddIdentity<LucidForums.Models.Entities.User, IdentityRole>(options =>
-            {
-                options.SignIn.RequireConfirmedAccount = false;
-            })
-            .AddEntityFrameworkStores<LucidForums.Data.ApplicationDbContext>()
+        services.AddIdentity<User, IdentityRole>(options => { options.SignIn.RequireConfirmedAccount = false; })
+            .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
         return services;
@@ -63,42 +79,44 @@ public static class ServiceCollectionExtensions
         });
 
         // Pluggable chat providers
-        services.AddSingleton<LucidForums.Services.Ai.IChatProvider, LucidForums.Services.Ai.Providers.OllamaChatProvider>();
-        services.AddSingleton<LucidForums.Services.Ai.IChatProvider, LucidForums.Services.Ai.Providers.LmStudioChatProvider>();
+        services.AddSingleton<IChatProvider, OllamaChatProvider>();
+        services.AddSingleton<IChatProvider, LmStudioChatProvider>();
 
         // Core AI services
-        services.AddSingleton<LucidForums.Services.Ai.ITextAiService, LucidForums.Services.Ai.TextAiService>();
-        services.AddSingleton<LucidForums.Services.Ai.IImageAiService, LucidForums.Services.Ai.ImageAiService>();
-        services.AddSingleton<LucidForums.Services.Llm.IOllamaChatService, LucidForums.Services.Ai.OllamaChatAdapter>();
+        services.AddSingleton<IAiSettingsService, AiSettingsService>();
+        services.AddSingleton<ITextAiService, TextAiService>();
+        services.AddSingleton<IImageAiService, ImageAiService>();
+        services.AddSingleton<IOllamaChatService, OllamaChatAdapter>();
 
         return services;
     }
 
     public static IServiceCollection AddLucidForumsSeeding(this IServiceCollection services)
     {
-        services.AddSingleton<LucidForums.Services.Seeding.IForumSeedingQueue, LucidForums.Services.Seeding.ForumSeedingQueue>();
-        services.AddHostedService<LucidForums.Services.Seeding.ForumSeedingHostedService>();
+        services.AddSingleton<IForumSeedingQueue, ForumSeedingQueue>();
+        services.AddSingleton<ISeedingProgressStore, InMemorySeedingProgressStore>();
+        services.AddHostedService<ForumSeedingHostedService>();
         return services;
     }
 
     public static IServiceCollection AddLucidForumsModeration(this IServiceCollection services)
     {
-        services.AddSingleton<LucidForums.Services.Moderation.IModerationService, LucidForums.Services.Moderation.ModerationService>();
+        services.AddSingleton<IModerationService, ModerationService>();
         return services;
     }
 
     public static IServiceCollection AddLucidForumsEmbedding(this IServiceCollection services)
     {
-        services.AddScoped<LucidForums.Services.Search.IEmbeddingService, LucidForums.Services.Search.EmbeddingService>();
+        services.AddScoped<IEmbeddingService, EmbeddingService>();
         return services;
     }
 
     public static IServiceCollection AddLucidForumsDomainServices(this IServiceCollection services)
     {
-        services.AddScoped<LucidForums.Services.Forum.IForumService, LucidForums.Services.Forum.ForumService>();
-        services.AddScoped<LucidForums.Services.Forum.IThreadService, LucidForums.Services.Forum.ThreadService>();
-        services.AddScoped<LucidForums.Services.Forum.IMessageService, LucidForums.Services.Forum.MessageService>();
-        services.AddScoped<LucidForums.Services.Forum.IThreadViewService, LucidForums.Services.Forum.ThreadViewService>();
+        services.AddScoped<IForumService, ForumService>();
+        services.AddScoped<IThreadService, ThreadService>();
+        services.AddScoped<IMessageService, MessageService>();
+        services.AddScoped<IThreadViewService, ThreadViewService>();
         services.AddScoped<ICharterService, CharterService>();
         return services;
     }
@@ -112,32 +130,30 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddLucidForumsObservability(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLucidForumsObservability(this IServiceCollection services,
+        IConfiguration configuration)
     {
         // Resource describing this service
         var serviceName = configuration["Service:Name"] ?? "LucidForums";
         var serviceVersion = configuration["Service:Version"] ?? "1.0.0";
         var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService(serviceName: serviceName, serviceVersion: serviceVersion)
+            .AddService(serviceName, serviceVersion: serviceVersion)
             .AddTelemetrySdk();
 
         // App-level ActivitySource/Meter for custom spans/metrics
-        services.AddSingleton<LucidForums.Services.Observability.ITelemetry, LucidForums.Services.Observability.Telemetry>();
+        services.AddSingleton<ITelemetry, Telemetry>();
 
         services.AddOpenTelemetry()
-            .ConfigureResource(rb => rb.AddService(serviceName: serviceName, serviceVersion: serviceVersion))
+            .ConfigureResource(rb => rb.AddService(serviceName, serviceVersion: serviceVersion))
             .WithTracing(tp => tp
                 .SetResourceBuilder(resourceBuilder)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddSource(LucidForums.Services.Observability.TelemetryConstants.ActivitySourceName)
+                .AddSource(TelemetryConstants.ActivitySourceName)
                 .AddOtlpExporter(otlp =>
                 {
                     var endpoint = configuration["Otlp:Endpoint"];
-                    if (!string.IsNullOrWhiteSpace(endpoint))
-                    {
-                        otlp.Endpoint = new Uri(endpoint);
-                    }
+                    if (!string.IsNullOrWhiteSpace(endpoint)) otlp.Endpoint = new Uri(endpoint);
                 }))
             .WithMetrics(mp => mp
                 .SetResourceBuilder(resourceBuilder)
@@ -145,14 +161,11 @@ public static class ServiceCollectionExtensions
                 .AddProcessInstrumentation()
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddMeter(LucidForums.Services.Observability.TelemetryConstants.MeterName)
+                .AddMeter(TelemetryConstants.MeterName)
                 .AddOtlpExporter(otlp =>
                 {
                     var endpoint = configuration["Otlp:Endpoint"];
-                    if (!string.IsNullOrWhiteSpace(endpoint))
-                    {
-                        otlp.Endpoint = new Uri(endpoint);
-                    }
+                    if (!string.IsNullOrWhiteSpace(endpoint)) otlp.Endpoint = new Uri(endpoint);
                 }));
 
         return services;

@@ -24,7 +24,6 @@ public static class ApplicationBuilderExtensions
         app.MapStaticAssets();
         return app;
     }
-
     public static WebApplication MapLucidForumsEndpoints(this WebApplication app)
     {
         // Attribute-routed API controllers
@@ -53,8 +52,17 @@ public static class ApplicationBuilderExtensions
         db.Database.EnsureCreated();
         try
         {
-            // Enable required extensions (no-op on SQLite)
-            db.Database.ExecuteSqlRaw("CREATE EXTENSION IF NOT EXISTS vector");
+            // Enable required extensions (handled inside SQL to avoid noisy errors when lacking privileges)
+            db.Database.ExecuteSqlRaw(@"DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+                CREATE EXTENSION vector;
+            END IF;
+        EXCEPTION
+            WHEN insufficient_privilege THEN
+                NULL;
+            WHEN OTHERS THEN
+                NULL;
+        END $$;");
 
             // Create embeddings table
             db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS message_embeddings (

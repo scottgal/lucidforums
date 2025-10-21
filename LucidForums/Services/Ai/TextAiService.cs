@@ -19,21 +19,37 @@ public class TextAiService : ITextAiService
     private readonly Histogram<double> _latency;
     private readonly Counter<long> _requests;
     private readonly Microsoft.Extensions.Options.IOptionsMonitor<Services.Observability.TelemetryOptions> _telemetryOptions;
+    private readonly IAiSettingsService _aiSettings;
 
-    public TextAiService(IEnumerable<IChatProvider> providers, IOptionsMonitor<AiOptions> options, Services.Observability.ITelemetry telemetry, Microsoft.Extensions.Options.IOptionsMonitor<Services.Observability.TelemetryOptions> telemetryOptions)
+    public TextAiService(IEnumerable<IChatProvider> providers, IOptionsMonitor<AiOptions> options, Services.Observability.ITelemetry telemetry, Microsoft.Extensions.Options.IOptionsMonitor<Services.Observability.TelemetryOptions> telemetryOptions, IAiSettingsService? aiSettings = null)
     {
         _providers = providers;
         _options = options;
         _telemetry = telemetry;
         _telemetryOptions = telemetryOptions;
+        _aiSettings = aiSettings ?? new FallbackAiSettings(options);
         var t = _telemetryOptions.CurrentValue;
         _latency = _telemetry.GetHistogram(t.Metrics.TextRequestsLatencyHistogram);
         _requests = _telemetry.GetCounter(t.Metrics.TextRequestsCounter);
     }
 
-    private IChatProvider ResolveProvider()
+    private sealed class FallbackAiSettings : IAiSettingsService
     {
-        var name = (_options.CurrentValue.Provider ?? "ollama").Trim().ToLowerInvariant();
+        private readonly IOptionsMonitor<AiOptions> _opts;
+        public FallbackAiSettings(IOptionsMonitor<AiOptions> opts) { _opts = opts; }
+        public string? GenerationProvider { get; set; }
+        public string? GenerationModel { get; set; }
+        public string? TranslationProvider { get; set; }
+        public string? TranslationModel { get; set; }
+        public string? EmbeddingProvider { get; set; }
+        public string? EmbeddingModel { get; set; }
+        public IReadOnlyList<string> KnownProviders { get; private set; } = Array.Empty<string>();
+        public void SetKnownProviders(IEnumerable<string> providers) { KnownProviders = providers.ToList(); }
+    }
+
+    private IChatProvider ResolveProvider(string? desired)
+    {
+        var name = (desired ?? _options.CurrentValue.Provider ?? "ollama").Trim().ToLowerInvariant();
         // prefer exact name match
         var provider = _providers.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         // fallback: if provider not found, default to first Ollama if available
@@ -45,9 +61,9 @@ public class TextAiService : ITextAiService
     public async Task<string> GenerateAsync(Charter charter, string userInput, string? model = null, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
-        var provider = ResolveProvider();
+        var provider = ResolveProvider(_aiSettings.GenerationProvider);
         var cur = _options.CurrentValue;
-        var activeModel = string.IsNullOrWhiteSpace(model) ? cur.DefaultModel : model;
+        var activeModel = string.IsNullOrWhiteSpace(model) ? (_aiSettings.GenerationModel ?? cur.DefaultModel) : model;
         var tcfg = _telemetryOptions.CurrentValue;
         using var activity = _telemetry.StartActivity(tcfg.Activities.TextGenerate, ActivityKind.Internal, a =>
         {
@@ -80,7 +96,7 @@ public class TextAiService : ITextAiService
     public async Task<string> TranslateAsync(string text, string targetLanguage, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
-        var provider = ResolveProvider();
+        var provider = ResolveProvider(_aiSettings.TranslationProvider);
         var cur = _options.CurrentValue;
         var tcfg = _telemetryOptions.CurrentValue;
         using var activity = _telemetry.StartActivity(tcfg.Activities.TextTranslate, ActivityKind.Internal, a =>
@@ -92,7 +108,7 @@ public class TextAiService : ITextAiService
         try
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
-            var result = await provider.TranslateAsync(text, targetLanguage, cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
+            var result = await provider.TranslateAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
             activity?.SetTag(tcfg.Tags.OutputLength, result?.Length ?? 0);
             return result;
         }
@@ -114,7 +130,7 @@ public class TextAiService : ITextAiService
     public async Task TranslateStreamAsync(string text, string targetLanguage, Func<string, Task> onChunk, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
-        var provider = ResolveProvider();
+        var provider = ResolveProvider(_aiSettings.TranslationProvider);
         var cur = _options.CurrentValue;
         var tcfg = _telemetryOptions.CurrentValue;
         using var activity = _telemetry.StartActivity(tcfg.Activities.TextTranslateStream, ActivityKind.Internal, a =>
@@ -127,7 +143,7 @@ public class TextAiService : ITextAiService
         try
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
-            await provider.TranslateStreamAsync(text, targetLanguage, cur.DefaultModel, cur.Temperature, cur.MaxTokens, onChunk, ct);
+            await provider.TranslateStreamAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, onChunk, ct);
         }
         catch (Exception ex)
         {
@@ -136,7 +152,7 @@ public class TextAiService : ITextAiService
             activity?.SetTag(tags.ExceptionType, ex.GetType().FullName);
             activity?.SetTag(tags.ExceptionMessage, ex.Message);
             // Fallback: non-streaming translate then chunk by words
-            var full = await provider.TranslateAsync(text, targetLanguage, cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
+            var full = await provider.TranslateAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
             var words = full.Split(' ');
             foreach (var w in words)
             {
@@ -148,5 +164,10 @@ public class TextAiService : ITextAiService
             sw.Stop();
             _latency.Record(sw.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>(_telemetryOptions.CurrentValue.Tags.Provider, provider.Name));
         }
+    }
+    public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default)
+    {
+        var provider = ResolveProvider(_aiSettings.GenerationProvider);
+        return provider.ListModelsAsync(ct);
     }
 }

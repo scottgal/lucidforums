@@ -56,6 +56,7 @@ public class OllamaChatProvider : IChatProvider
             {
                 model = activeModel,
                 prompt,
+                stream = false,
                 options = new { temperature = temperature ?? optionsFallback.Temperature, num_predict = maxTokens ?? optionsFallback.MaxTokens }
             };
 
@@ -195,6 +196,44 @@ public class OllamaChatProvider : IChatProvider
                     catch { }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            var tags = _telemetryOptions.CurrentValue.Tags;
+            activity?.SetTag(tags.Error, true);
+            activity?.SetTag(tags.ExceptionType, ex.GetType().FullName);
+            activity?.SetTag(tags.ExceptionMessage, ex.Message);
+            throw;
+        }
+    }
+    public async Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct)
+    {
+        var tcfg = _telemetryOptions.CurrentValue;
+        using var activity = _telemetry.StartActivity("Ollama.ListModels", ActivityKind.Client, a =>
+        {
+            a?.SetTag(tcfg.Tags.System, "ollama");
+        });
+        try
+        {
+            var client = _httpClientFactory.CreateClient("ollama");
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Get, new Uri(_ollama.GetBaseAddress(), "/api/tags"));
+            using var response = await client.SendAsync(httpRequest, ct);
+            response.EnsureSuccessStatusCode();
+            var body = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(body);
+            var list = new List<string>();
+            if (doc.RootElement.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in models.EnumerateArray())
+                {
+                    if (m.TryGetProperty("name", out var nameEl))
+                    {
+                        var name = nameEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(name)) list.Add(name);
+                    }
+                }
+            }
+            return list;
         }
         catch (Exception ex)
         {

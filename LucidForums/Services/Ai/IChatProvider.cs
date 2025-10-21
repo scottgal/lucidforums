@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using LucidForums.Models.Entities;
@@ -14,4 +15,9 @@ public interface IChatProvider
     Task<string> TranslateAsync(string text, string targetLanguage, string? model, double? temperature, int? maxTokens, CancellationToken ct);
 
     Task TranslateStreamAsync(string text, string targetLanguage, string? model, double? temperature, int? maxTokens, Func<string, Task> onChunk, CancellationToken ct);
+
+    /// <summary>
+    /// Returns a list of available model identifiers for this provider.
+    /// </summary>
+    Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct);
 }

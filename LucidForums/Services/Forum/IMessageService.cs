@@ -19,12 +19,24 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
 
     public async Task<Message> ReplyAsync(Guid threadId, Guid? parentMessageId, string content, string? authorId, CancellationToken ct = default)
     {
+        // Validate author exists; otherwise use null to avoid FK violations
+        string? validAuthorId = null;
+        if (!string.IsNullOrWhiteSpace(authorId))
+        {
+            try
+            {
+                bool exists = await db.Users.AsNoTracking().AnyAsync(u => u.Id == authorId, ct);
+                if (exists) validAuthorId = authorId;
+            }
+            catch { }
+        }
+
         var msg = new Message
         {
             ForumThreadId = threadId,
             ParentId = parentMessageId,
             Content = content,
-            CreatedById = authorId,
+            CreatedById = validAuthorId,
             CreatedAtUtc = DateTime.UtcNow
         };
 

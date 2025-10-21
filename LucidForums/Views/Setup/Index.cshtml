@@ -4,74 +4,65 @@
 <h1 class="text-2xl font-bold mb-4">Setup Sample Forum</h1>
 <p class="mb-4">Use this tool to generate a sample forum with realistic threads and replies using the configured AI model. Data will be added in the background and progress will appear live below.</p>
 
-<form id="setupForm" method="post" action="/Setup/Start" class="space-y-3">
+<form id="setupForm" method="post" action="/Setup/Start" class="space-y-3" hx-post="/Setup/Start" hx-target="#progress" hx-swap="innerHTML" hx-include="#setupForm">
     @Html.AntiForgeryToken()
     <div>
         <label class="block text-sm font-medium">Forum Name</label>
-        <input name="ForumName" class="border p-2 w-full" placeholder="e.g., Dreaming & Lucid Exploration" required />
+        <div class="flex gap-2 items-center">
+            <input id="ForumName" name="ForumName" class="input-md flex-1" placeholder="e.g., Dreaming & Lucid Exploration" required />
+            <button type="button" class="btn btn-sm" title="AI generate"
+                    hx-post="/Setup/GenForumName" hx-target="#ForumName" hx-swap="outerHTML"
+                    hx-include="#Description,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
     </div>
     <div>
         <label class="block text-sm font-medium">Description (optional)</label>
-        <input name="Description" class="border p-2 w-full" placeholder="A cozy space to discuss lucid dreams and techniques" />
+        <div class="flex gap-2 items-center">
+            <input id="Description" name="Description" class="input-md flex-1" placeholder="A cozy space to discuss lucid dreams and techniques" />
+            <button type="button" class="btn btn-sm" title="AI generate"
+                    hx-post="/Setup/GenDescription" hx-target="#Description" hx-swap="outerHTML"
+                    hx-include="#ForumName,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
     </div>
-    <div class="flex gap-4">
+    <div>
+        <label class="block text-sm font-medium">Site Purpose (optional)</label>
+        <div class="flex gap-2 items-center">
+            <input id="SitePurpose" name="SitePurpose" class="input-md flex-1" placeholder="Brief description of what this forum is about" />
+            <button type="button" class="btn btn-sm" title="AI generate"
+                    hx-post="/Setup/GenSitePurpose" hx-target="#SitePurpose" hx-swap="outerHTML"
+                    hx-include="#ForumName,#Description,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium">Charter Description (optional)</label>
+        <div class="flex gap-2 items-center">
+            <input id="CharterDescription" name="CharterDescription" class="input-md flex-1" placeholder="Guidelines and tone for generated content" />
+            <button type="button" class="btn btn-sm" title="AI generate"
+                    hx-post="/Setup/GenCharter" hx-target="#CharterDescription" hx-swap="outerHTML"
+                    hx-include="#ForumName,#Description,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div class="flex gap-4 items-end">
         <div>
             <label class="block text-sm font-medium">Threads</label>
-            <input name="ThreadCount" type="number" value="3" min="1" max="20" class="border p-2 w-24" />
+            <input id="ThreadCount" name="ThreadCount" type="number" value="3" min="1" max="20" class="border p-2 w-24" />
         </div>
         <div>
             <label class="block text-sm font-medium">Replies per thread</label>
-            <input name="RepliesPerThread" type="number" value="2" min="0" max="20" class="border p-2 w-24" />
+            <input id="RepliesPerThread" name="RepliesPerThread" type="number" value="2" min="0" max="20" class="border p-2 w-24" />
+        </div>
+        <div class="flex-1 text-right">
+            <button type="button" class="bg-emerald-600 text-white px-3 py-2 rounded" title="AI: Generate all & start"
+                    hx-post="/Setup/GenAllAndStart" hx-target="#progress" hx-swap="innerHTML"
+                    hx-include="#ThreadCount,#RepliesPerThread,#setupForm input[name='__RequestVerificationToken']">One‑click Generate & Seed</button>
         </div>
     </div>
     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Start Seeding</button>
 </form>
 
-<div id="progress" class="mt-6 border rounded p-3 h-64 overflow-auto bg-gray-50">
+<div id="progress" class="mt-6 border rounded p-3 h-64 overflow-auto bg-gray-50" data-hub-path="@LucidForums.Hubs.SeedingHub.HubPath">
     <div class="text-gray-500">No job started yet.</div>
 </div>
 
 @section Scripts {
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js" integrity="sha512-mZJtJ7KkN6wY2/XKMlS4FtsbF5u1xZJ8x67zVGDJq5SgB7PehH0mUwc3f7+0JZcHikKQ8HkP1FQf4q2oQv2YEA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
-        const hubPath = '@LucidForums.Hubs.SeedingHub.HubPath';
-        let connection = null;
-        let currentJobId = null;
-
-        function logProgress(p) {
-            const box = document.getElementById('progress');
-            if (box.firstElementChild && box.firstElementChild.classList.contains('text-gray-500')) {
-                box.innerHTML = '';
-            }
-            const line = document.createElement('div');
-            const ts = new Date().toLocaleTimeString();
-            line.textContent = `[${ts}] ${p.stage}: ${p.message}`;
-            box.appendChild(line);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        async function ensureConnection() {
-            if (connection) return connection;
-            connection = new signalR.HubConnectionBuilder().withUrl(hubPath).withAutomaticReconnect().build();
-            connection.on('progress', logProgress);
-            await connection.start();
-            return connection;
-        }
-
-        document.getElementById('setupForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const formData = new FormData(form);
-            const res = await fetch(form.action, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-            if (!res.ok) {
-                alert('Failed to start seeding');
-                return;
-            }
-            const data = await res.json();
-            currentJobId = data.jobId;
-            const conn = await ensureConnection();
-            await conn.invoke('JoinJob', currentJobId);
-            logProgress({ stage: 'init', message: 'Subscribed to job ' + currentJobId });
-        });
-    </script>
 }

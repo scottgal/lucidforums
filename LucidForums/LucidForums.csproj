@@ -28,7 +28,6 @@
       <PackageReference Include="Npgsql.OpenTelemetry" Version="9.0.4" />
       <PackageReference Include="OllamaSharp" Version="5.4.8" />
       <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.10" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.10">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

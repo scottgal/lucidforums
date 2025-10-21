@@ -8,7 +8,7 @@ public class SettingsController(OllamaOptions ollamaOptions) : Controller
     [HttpGet]
     public IActionResult Index()
     {
-        ViewData["Title"] = "Settings";
-        return View(ollamaOptions);
+        // Unify with AI Settings page
+        return RedirectToAction("Index", "AdminAiSettings", new { area = "" });
     }
 }

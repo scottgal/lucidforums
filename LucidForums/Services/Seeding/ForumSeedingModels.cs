@@ -8,7 +8,9 @@ public record ForumSeedingRequest(
     string ForumSlug,
     string? Description,
     int ThreadCount,
-    int RepliesPerThread
+    int RepliesPerThread,
+    string? SitePurpose = null,
+    string? CharterDescription = null
 );
 
 public record ForumSeedingProgress(

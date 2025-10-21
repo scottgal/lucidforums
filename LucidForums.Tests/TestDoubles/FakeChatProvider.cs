@@ -25,6 +25,7 @@ public sealed class FakeChatProvider : IChatProvider
 
     public string GenerateResult { get; set; } = "generated";
     public string TranslateResult { get; set; } = "translated";
+    public List<string> Models { get; set; } = new() { "model-a", "model-b" };
 
     public FakeChatProvider(string name)
     {
@@ -57,4 +58,7 @@ public sealed class FakeChatProvider : IChatProvider
         }
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct)
+        => Task.FromResult((IReadOnlyList<string>)Models);
 }
