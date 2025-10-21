@@ -1,0 +1,45 @@
+﻿@model LucidForums.Models.ViewModels.CharterDetailsVm
+@{
+    ViewData["Title"] = Model.Name;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<a class="link" href="/Charters">← Back to list</a>
+<h1 class="text-2xl font-bold mb-2">@Model.Name</h1>
+<p class="mb-4 text-slate-700">@Model.Purpose</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <section>
+        <h2 class="text-xl font-semibold mb-2">Rules</h2>
+        @if (Model.Rules?.Count > 0)
+        {
+            <ul class="list-disc pl-6">
+                @foreach (var r in Model.Rules)
+                {
+                    <li>@r</li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="text-slate-500">No rules defined.</p>
+        }
+    </section>
+    <section>
+        <h2 class="text-xl font-semibold mb-2">Expected Behaviors</h2>
+        @if (Model.Behaviors?.Count > 0)
+        {
+            <ul class="list-disc pl-6">
+                @foreach (var b in Model.Behaviors)
+                {
+                    <li>@b</li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="text-slate-500">No behaviors defined.</p>
+        }
+    </section>
+</div>
+<p class="mt-6">
+    <a class="btn" href="/Charters/Edit/@Model.Id">Edit Charter</a>
+</p>

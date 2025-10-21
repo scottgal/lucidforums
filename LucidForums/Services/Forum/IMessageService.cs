@@ -10,7 +10,7 @@ public interface IMessageService
     Task<List<Message>> ListByThreadAsync(Guid threadId, CancellationToken ct = default);
 }
 
-public class MessageService(LucidForums.Data.ApplicationDbContext db) : IMessageService
+public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService) : IMessageService
 {
     public Task<Message?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -39,6 +39,14 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db) : IMessage
         msg.Path = string.IsNullOrEmpty(parentPath) ? msg.Id.ToString("N") : parentPath + "." + msg.Id.ToString("N");
         db.Entry(msg).Property(x => x.Path).IsModified = true;
         await db.SaveChangesAsync(ct);
+
+        // Fire-and-forget indexing (do not block reply creation)
+        _ = Task.Run(async () =>
+        {
+            try { await embeddingService.IndexMessageAsync(msg.Id, CancellationToken.None); }
+            catch { /* swallow */ }
+        });
+
         return msg;
     }
 

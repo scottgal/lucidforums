@@ -1,0 +1,34 @@
+﻿@model IEnumerable<LucidForums.Models.ViewModels.CharterListItemVm>
+@{
+    ViewData["Title"] = "Charters";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<h1 class="text-2xl font-bold mb-4">Charters</h1>
+<p class="mb-4">
+    <a class="btn" href="/Charters/Create">Create New Charter</a>
+</p>
+<table class="min-w-full">
+    <thead>
+        <tr>
+            <th class="text-left p-2">Name</th>
+            <th class="text-left p-2">Purpose</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var c in Model)
+    {
+        <tr class="border-b">
+            <td class="p-2 font-medium">@c.Name</td>
+            <td class="p-2 text-slate-700">@c.Purpose</td>
+            <td class="p-2 text-right">
+                <a class="link" href="/Charters/@c.Id">View</a>
+                |
+                <a class="link" href="/Charters/Edit/@c.Id">Edit</a>
+                |
+                <a class="link text-red-600" href="/Charters/Delete/@c.Id">Delete</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

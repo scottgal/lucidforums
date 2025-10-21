@@ -1,0 +1,39 @@
+﻿@model LucidForums.Models.ViewModels.SearchPageVm
+@{
+    ViewData["Title"] = Model.ForumSlug == null ? "Search" : $"Search {Model.ForumSlug}";
+}
+<div class="container mt-4">
+    <h2>@ViewData["Title"]</h2>
+    <form method="get" class="mb-3" action="@(Model.ForumSlug == null ? Url.Action("Index", "Search") : Url.Action("Forum", "Search", new { slug = Model.ForumSlug }))">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search..." value="@Model.Query" />
+            <button class="btn btn-primary" type="submit">Search</button>
+        </div>
+    </form>
+
+    @if (Model.Results.Count == 0)
+    {
+        <div class="alert alert-info">No results</div>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var r in Model.Results)
+            {
+                <li class="list-group-item">
+                    <div class="small text-muted">
+                        @if (Model.ForumSlug == null)
+                        {
+                            <span>Forum: <a href="@Url.Action("Details", "Forum", new { slug = r.ForumSlug })">@r.ForumSlug</a></span>
+                            <span> · </span>
+                        }
+                        <span>Score: @r.Score.ToString("0.000")</span>
+                    </div>
+                    <div>
+                        <a href="@Url.Action("Show", "Threads", new { id = r.ThreadId })#msg-@r.MessageId">@r.Snippet</a>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</div>

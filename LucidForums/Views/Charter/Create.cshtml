@@ -1,0 +1,17 @@
+﻿@model LucidForums.Models.ViewModels.CharterEditVm
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Create Charter";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<a class="link" href="/Charters">← Back to list</a>
+<h1 class="text-2xl font-bold mb-4">Create Charter</h1>
+<form asp-action="Create" asp-controller="Charter" method="post">
+    <partial name="_Form" model="Model" />
+    <div class="mt-6">
+        <button class="btn" type="submit">Create</button>
+    </div>
+</form>
+@section Scripts{
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,22 @@
+﻿@model LucidForums.Models.ViewModels.CharterEditVm
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+<div class="space-y-4">
+    <div>
+        <label class="block font-medium" asp-for="Name"></label>
+        <input class="input w-full" asp-for="Name" />
+        <span class="text-red-600" asp-validation-for="Name"></span>
+    </div>
+    <div>
+        <label class="block font-medium" asp-for="Purpose"></label>
+        <textarea class="textarea w-full" rows="3" asp-for="Purpose"></textarea>
+        <span class="text-red-600" asp-validation-for="Purpose"></span>
+    </div>
+    <div>
+        <label class="block font-medium" for="RulesMultiline">Rules (one per line)</label>
+        <textarea class="textarea w-full" rows="6" asp-for="RulesMultiline"></textarea>
+    </div>
+    <div>
+        <label class="block font-medium" for="BehaviorsMultiline">Expected Behaviors (one per line)</label>
+        <textarea class="textarea w-full" rows="6" asp-for="BehaviorsMultiline"></textarea>
+    </div>
+</div>

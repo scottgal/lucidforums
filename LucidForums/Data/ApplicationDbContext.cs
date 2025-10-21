@@ -95,6 +95,28 @@ public class ApplicationDbContext : IdentityDbContext<User>
         modelBuilder.Entity<Charter>(e =>
         {
             e.HasKey(x => x.Id);
+
+            // Seed sample data
+            var c1Id = Guid.Parse("11111111-1111-1111-1111-111111111111");
+            var c2Id = Guid.Parse("22222222-2222-2222-2222-222222222222");
+            e.HasData(
+                new Charter
+                {
+                    Id = c1Id,
+                    Name = "General Community Charter",
+                    Purpose = "Foster respectful, constructive discussions on a wide range of topics.",
+                    Rules = new List<string> { "Be respectful", "No hate speech", "No spam or advertising" },
+                    Behaviors = new List<string> { "Assume good intent", "Use evidence and cite sources", "Welcome newcomers" }
+                },
+                new Charter
+                {
+                    Id = c2Id,
+                    Name = "Makers & Builders Charter",
+                    Purpose = "Share projects, get feedback, and help others build things.",
+                    Rules = new List<string> { "Show your work", "Be constructive in feedback", "Tag NSFW content appropriately" },
+                    Behaviors = new List<string> { "Encourage collaboration", "Offer actionable suggestions", "Celebrate progress" }
+                }
+            );
         });
 
         // Enable PostgreSQL ltree extension if using Npgsql

@@ -1,6 +1,6 @@
 ﻿services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: lucidforums-postgres
     environment:
       POSTGRES_DB: lucidforums
@@ -50,6 +50,7 @@
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__Default=Host=db;Port=5432;Database=lucidforums;Username=lucid;Password=lucidpassword
       - OLLAMA_ENDPOINT=http://ollama:11434
+      - Embedding__Model=mxbai-embed-large
     ports:
       - "8080:8080"
     networks:

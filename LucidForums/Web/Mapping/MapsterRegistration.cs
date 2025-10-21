@@ -19,6 +19,12 @@ public static class MapsterRegistration
             .Map(dest => dest.AuthorId, src => src.CreatedById)
             .Map(dest => dest.ForumId, src => src.ForumId);
 
+        // Charter mappings
+        config.NewConfig<Charter, CharterListItemVm>();
+        config.NewConfig<Charter, CharterDetailsVm>()
+            .Map(dest => dest.Rules, src => src.Rules)
+            .Map(dest => dest.Behaviors, src => src.Behaviors);
+
         // DTO -> VM (use existing ThreadViewService projections)
         config.NewConfig<MessageView, MessageVm>();
         config.NewConfig<ThreadView, ThreadVm>()

@@ -17,4 +17,9 @@ public interface IAppMapper
     ThreadSummaryVm ToThreadSummaryVm(ForumThread src);
     IEnumerable<ThreadSummaryVm> ToThreadSummaryVms(IEnumerable<ForumThread> src);
     IEnumerable<ForumListItemVm> ToForumListItemVms(IEnumerable<Forum> src);
+
+    // Charter
+    CharterListItemVm ToCharterListItemVm(Charter src);
+    IEnumerable<CharterListItemVm> ToCharterListItemVms(IEnumerable<Charter> src);
+    CharterDetailsVm ToCharterDetailsVm(Charter src);
 }
