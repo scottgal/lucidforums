@@ -28,7 +28,8 @@ if (mapperImpl is not null)
 }
 else
 {
-    builder.Services.AddSingleton<LucidForums.Web.Mapping.IAppMapper>(_ => throw new InvalidOperationException("Mapster source-generated mapper not found. Ensure Mapster.SourceGenerator is installed and the project is built."));
+    // Fallback to a runtime mapper so the app can run without the source generator
+    builder.Services.AddSingleton<LucidForums.Web.Mapping.IAppMapper, LucidForums.Web.Mapping.RuntimeAppMapper>();
 }
 
 var app = builder.Build();
