@@ -16,6 +16,9 @@ public class Message
 
     public string Content { get; set; } = string.Empty;
 
+    // Score (0-100) indicating how well this message aligns with the forum's charter; null if not evaluated
+    public double? CharterScore { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }
     public User? CreatedBy { get; set; }

@@ -4,6 +4,8 @@ using LucidForums.Services.Forum;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using LucidForums.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace LucidForums.Services.Seeding;
 
@@ -33,7 +35,34 @@ public class ForumSeedingHostedService(
                 var forum = await forumService.CreateAsync(job.ForumName, job.ForumSlug, job.Description, null, stoppingToken);
                 await Broadcast(job.JobId, "forum", $"Created forum {forum.Name}", forum.Id.ToString());
 
-                var seedCharter = new Models.Entities.Charter {
+                // Choose a charter to guide content tone
+                var db = sp.GetRequiredService<ApplicationDbContext>();
+                Models.Entities.Charter? selectedCharter = null;
+                try
+                {
+                    var charters = await db.Charters.AsNoTracking().OrderBy(c => c.Name).ToListAsync(stoppingToken);
+                    if (charters.Count > 0)
+                    {
+                        // Simple selection: pick one based on hash of forum Id for determinism across runs
+                        var index = Math.Abs(forum.Id.GetHashCode()) % charters.Count;
+                        selectedCharter = charters[index];
+                        await Broadcast(job.JobId, "charter", $"Selected charter: '{selectedCharter.Name}'", selectedCharter.Id.ToString());
+
+                        // Attach charter to forum
+                        var tracked = await db.Forums.FirstOrDefaultAsync(f => f.Id == forum.Id, stoppingToken);
+                        if (tracked is not null)
+                        {
+                            tracked.CharterId = selectedCharter.Id;
+                            await db.SaveChangesAsync(stoppingToken);
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore charter selection errors; will fallback to ad-hoc charter
+                }
+
+                var seedCharter = selectedCharter ?? new Models.Entities.Charter {
                     Name = string.IsNullOrWhiteSpace(job.ForumName) ? "Forum Seed" : job.ForumName,
                     Purpose = string.IsNullOrWhiteSpace(job.CharterDescription)
                         ? ($"Generate realistic forum content. Site purpose: {job.SitePurpose ?? job.Description ?? job.ForumName}. Keep tone friendly, inclusive, and on-topic.")
@@ -50,6 +79,12 @@ public class ForumSeedingHostedService(
                     var contentPrompt = $"Write an engaging opening post for a thread titled '{title}'. It should fit the forum purpose: '{job.SitePurpose ?? job.Description}'. 2-4 paragraphs, markdown allowed. Keep it under 250 words.";
                     var content = await ai.GenerateAsync(seedCharter, contentPrompt, ct: stoppingToken);
 
+                    if (job.IncludeEmoticons)
+                    {
+                        title = MaybeAddEmoticonToTitle(title);
+                        content = AddEmoticonsToText(content);
+                    }
+
                     var author = RandomAuthor();
                     var thread = await threadService.CreateAsync(forum.Id, TrimLine(title, 120), content, null, stoppingToken);
                     await Broadcast(job.JobId, "thread", $"Created thread '{thread.Title}' by {author}", thread.Id.ToString());
@@ -58,7 +93,11 @@ public class ForumSeedingHostedService(
                     for (int r = 0; r < job.RepliesPerThread; r++)
                     {
                         var replyPrompt = $"Write a realistic forum reply to the thread titled '{thread.Title}'. 1-2 short paragraphs. Keep it conversational and varying opinions.";
-                        var reply = await ai.GenerateAsync(new Models.Entities.Charter { Name = job.ForumName, Purpose = "Seed forum content" }, replyPrompt, ct: stoppingToken);
+                        var reply = await ai.GenerateAsync(seedCharter, replyPrompt, ct: stoppingToken);
+                        if (job.IncludeEmoticons)
+                        {
+                            reply = AddEmoticonsToText(reply);
+                        }
                         var replyAuthor = RandomAuthor();
                         var msg = await messageService.ReplyAsync(thread.Id, null, reply, null, stoppingToken);
                         await Broadcast(job.JobId, "reply", $"Reply by {replyAuthor}", msg.Id.ToString());
@@ -101,5 +140,45 @@ public class ForumSeedingHostedService(
     {
         var rng = Random.Shared;
         return $"{SampleFirstNames[rng.Next(SampleFirstNames.Length)]} {SampleLastNames[rng.Next(SampleLastNames.Length)]}";
+    }
+
+    private static readonly string[] Emoticons = new[] { "🙂", "😄", "😅", "🤔", "🙌", "👍", "🌟", "✨", "😴", "😎", "😉", "😂", "🤝", "🎯" };
+
+    private static string MaybeAddEmoticonToTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return title ?? string.Empty;
+        var rng = Random.Shared;
+        // 40% chance to append one emoticon if short enough
+        if (rng.NextDouble() < 0.4 && title.Length < 110)
+        {
+            var emo = Emoticons[rng.Next(Emoticons.Length)];
+            // Avoid duplicate emoticon if already ends with one
+            if (!char.IsSurrogate(title[^1]))
+            {
+                return title.TrimEnd() + " " + emo;
+            }
+        }
+        return title;
+    }
+
+    private static string AddEmoticonsToText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text ?? string.Empty;
+        var rng = Random.Shared;
+        var lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+        int added = 0;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            // 50% chance per non-empty line, cap total to 3 additions
+            if (rng.NextDouble() < 0.5 && added < 3)
+            {
+                var emo = Emoticons[rng.Next(Emoticons.Length)];
+                lines[i] = line.TrimEnd() + " " + emo;
+                added++;
+            }
+        }
+        return string.Join('\n', lines);
     }
 }

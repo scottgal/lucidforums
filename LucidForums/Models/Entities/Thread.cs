@@ -13,6 +13,9 @@ public class ForumThread
     public Guid? RootMessageId { get; set; }
     public Message? RootMessage { get; set; }
 
+    // Score (0-100) indicating how well this thread (title + root content) aligns with the forum's charter; null if not evaluated
+    public double? CharterScore { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }
     public User? CreatedBy { get; set; }

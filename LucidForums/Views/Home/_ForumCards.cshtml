@@ -1,0 +1,30 @@
+﻿@model IEnumerable<LucidForums.Models.ViewModels.ForumListItemVm>
+
+<div class="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+@if (Model != null && Model.Any())
+{
+    foreach (var f in Model)
+    {
+        <a class="card bg-base-100 hover:shadow-xl transition-shadow border border-base-300" href="@Url.Action("Details", "Forum", new { slug = f.Slug })">
+            <div class="card-body">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="card-title">@f.Name</h3>
+                        <p class="text-base-content/70 mt-1">@f.Description</p>
+                    </div>
+                    <div class="badge badge-lg">Forum</div>
+                </div>
+                <div class="card-actions mt-4 text-sm text-base-content/70">
+                    <span class="ml-auto link link-primary">Enter</span>
+                </div>
+            </div>
+        </a>
+    }
+}
+else
+{
+    <div class="alert">
+        <span>No forums yet. Be the first to <a class="link" href="@Url.Action("Create", "Forum")">create one</a>.</span>
+    </div>
+}
+</div>

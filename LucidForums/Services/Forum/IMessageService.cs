@@ -12,7 +12,7 @@ public interface IMessageService
     Task<List<Message>> ListByThreadAsync(Guid threadId, CancellationToken ct = default);
 }
 
-public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, LucidForums.Services.Analysis.IToneAdvisor toneAdvisor) : IMessageService
+public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, LucidForums.Services.Analysis.IToneAdvisor toneAdvisor, LucidForums.Services.Analysis.ICharterScoringService charterScoring) : IMessageService
 {
     public Task<Message?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -73,6 +73,32 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
             }
         }
         catch { /* best-effort only */ }
+
+        // Compute and store charter score (best-effort)
+        try
+        {
+            var threadWithForum = await db.Threads.AsNoTracking()
+                .Where(t => t.Id == threadId)
+                .Select(t => new { t.Id, t.ForumId })
+                .FirstOrDefaultAsync(ct);
+            if (threadWithForum is not null)
+            {
+                var forum = await db.Forums.AsNoTracking().Include(f => f.Charter)
+                    .FirstOrDefaultAsync(f => f.Id == threadWithForum.ForumId, ct);
+                var charter = forum?.Charter;
+                if (charter is not null)
+                {
+                    var score = await charterScoring.ScoreAsync(charter, msg.Content, ct);
+                    if (score.HasValue)
+                    {
+                        msg.CharterScore = score.Value;
+                        db.Entry(msg).Property(x => x.CharterScore).IsModified = true;
+                        await db.SaveChangesAsync(ct);
+                    }
+                }
+            }
+        }
+        catch { }
 
         // Fire-and-forget indexing (do not block reply creation)
         _ = Task.Run(async () =>

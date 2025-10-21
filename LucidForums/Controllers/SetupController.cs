@@ -11,7 +11,7 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
         return View();
     }
 
-    public record StartRequest(string ForumName, string? Description, int ThreadCount = 3, int RepliesPerThread = 2, string? SitePurpose = null, string? CharterDescription = null)
+    public record StartRequest(string ForumName, string? Description, int ThreadCount = 3, int RepliesPerThread = 2, string? SitePurpose = null, string? CharterDescription = null, bool IncludeEmoticons = false)
     {
         public string Slug => (ForumName ?? "sample-forum").Trim().ToLowerInvariant().Replace(" ", "-");
     }
@@ -28,7 +28,7 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
         }
 
         var jobId = Guid.NewGuid();
-        var job = new ForumSeedingRequest(jobId, req.ForumName, req.Slug, req.Description, Math.Clamp(req.ThreadCount,1,20), Math.Clamp(req.RepliesPerThread,0,20), req.SitePurpose, req.CharterDescription);
+        var job = new ForumSeedingRequest(jobId, req.ForumName, req.Slug, req.Description, Math.Clamp(req.ThreadCount,1,20), Math.Clamp(req.RepliesPerThread,0,20), req.SitePurpose, req.CharterDescription, req.IncludeEmoticons);
         await queue.EnqueueAsync(job, ct);
 
         // If htmx, return polling fragment; else return JSON
@@ -116,19 +116,19 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GenAllAndStart([FromForm] int ThreadCount = 3, [FromForm] int RepliesPerThread = 2, CancellationToken ct = default)
+    public async Task<IActionResult> GenAllAndStart([FromForm] int ThreadCount = 3, [FromForm] int RepliesPerThread = 2, [FromForm] bool IncludeEmoticons = false, CancellationToken ct = default)
     {
         // Generate sensible defaults
         var charter = new LucidForums.Models.Entities.Charter { Name = "Forum Setup", Purpose = "Generate forum seed" };
-        var name = await ai.GenerateAsync(charter, "Suggest a concise, appealing forum name about lucid dreaming & exploration. Return only the name.", ct: ct);
+        var name = await ai.GenerateAsync(charter, "Suggest a concise, appealing forum name. Make it appeal to a western adult male geek in his early 50s. Return only the name.", ct: ct);
         var forumName = string.IsNullOrWhiteSpace(name) ? "Dreamers Hub" : name.Trim();
         var desc = await ai.GenerateAsync(new LucidForums.Models.Entities.Charter { Name = forumName, Purpose = "Description" }, $"One-sentence description for '{forumName}', under 160 chars.", ct: ct);
         var sitePurpose = await ai.GenerateAsync(new LucidForums.Models.Entities.Charter { Name = forumName, Purpose = "Purpose" }, $"Short phrase describing the site purpose for '{forumName}'.", ct: ct);
         var charterDesc = await ai.GenerateAsync(new LucidForums.Models.Entities.Charter { Name = forumName, Purpose = "Charter" }, $"1-2 sentence charter setting tone and rules for '{forumName}'.", ct: ct);
 
-        var req = new StartRequest(forumName, desc, ThreadCount, RepliesPerThread, sitePurpose, charterDesc);
+        var req = new StartRequest(forumName, desc, ThreadCount, RepliesPerThread, sitePurpose, charterDesc, IncludeEmoticons);
         var jobId = Guid.NewGuid();
-        var job = new ForumSeedingRequest(jobId, req.ForumName, req.Slug, req.Description, Math.Clamp(req.ThreadCount,1,20), Math.Clamp(req.RepliesPerThread,0,20), req.SitePurpose, req.CharterDescription);
+        var job = new ForumSeedingRequest(jobId, req.ForumName, req.Slug, req.Description, Math.Clamp(req.ThreadCount,1,20), Math.Clamp(req.RepliesPerThread,0,20), req.SitePurpose, req.CharterDescription, req.IncludeEmoticons);
         await queue.EnqueueAsync(job, ct);
 
         var html = $@"<div id=""progress""><div class=""text-sm"">Generated forum '<b>{System.Net.WebUtility.HtmlEncode(forumName)}</b>' – starting seeding…</div><div id=""progressPoller"" hx-get=""/Setup/Progress?jobId={jobId}"" hx-trigger=""load, every 1s"" hx-target=""#progress"" hx-swap=""innerHTML""></div></div>";

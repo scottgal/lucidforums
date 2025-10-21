@@ -129,6 +129,7 @@ public static class ServiceCollectionExtensions
         // Analysis helpers (tags and tone advice)
         services.AddScoped<ITagExtractionService, TagExtractionService>();
         services.AddScoped<IToneAdvisor, ToneAdvisor>();
+        services.AddScoped<ICharterScoringService, CharterScoringService>();
         return services;
     }
 

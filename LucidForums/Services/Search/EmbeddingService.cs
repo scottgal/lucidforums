@@ -151,11 +151,11 @@ public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFa
         var emb = await EmbedAsync(msg.Content, ct);
         var embLiteral = "[" + string.Join(",", emb.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
 
-        // Upsert
-        var sql = @"INSERT INTO message_embeddings (message_id, forum_id, thread_id, content_hash, embedding, created_at)
-VALUES ({0}, {1}, {2}, {3}, {4}::vector, now())
+        // Upsert (inline the vector literal to avoid parameter cast issues with ::vector)
+        var sql = $@"INSERT INTO message_embeddings (message_id, forum_id, thread_id, content_hash, embedding, created_at)
+VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {embLiteral}::vector, now())
 ON CONFLICT (message_id) DO UPDATE SET content_hash = excluded.content_hash, embedding = excluded.embedding, created_at = now();";
-        await _db.Database.ExecuteSqlRawAsync(sql, msg.Id, thread.ForumId, thread.Id, hash, embLiteral);
+        await _db.Database.ExecuteSqlRawAsync(sql, msg.Id, thread.ForumId, thread.Id, hash);
     }
 
     public async Task<List<(Guid MessageId, double Score)>> SearchAsync(string query, Guid? forumId, int limit = 10, CancellationToken ct = default)
@@ -165,14 +165,14 @@ ON CONFLICT (message_id) DO UPDATE SET content_hash = excluded.content_hash, emb
         string sql;
         if (forumId.HasValue)
         {
-            sql = @"SELECT message_id, (embedding <=> {0}::vector) AS score FROM message_embeddings WHERE forum_id = {1} ORDER BY embedding <=> {0}::vector ASC LIMIT {2}";
-            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, embLiteral, forumId.Value, limit).ToListAsync(ct);
+            sql = $@"SELECT message_id, (embedding <=> {embLiteral}::vector) AS score FROM message_embeddings WHERE forum_id = {{0}} ORDER BY embedding <=> {embLiteral}::vector ASC LIMIT {{1}}";
+            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, forumId.Value, limit).ToListAsync(ct);
             return rows.Select(r => (r.message_id, r.score)).ToList();
         }
         else
         {
-            sql = @"SELECT message_id, (embedding <=> {0}::vector) AS score FROM message_embeddings ORDER BY embedding <=> {0}::vector ASC LIMIT {1}";
-            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, embLiteral, limit).ToListAsync(ct);
+            sql = $@"SELECT message_id, (embedding <=> {embLiteral}::vector) AS score FROM message_embeddings ORDER BY embedding <=> {embLiteral}::vector ASC LIMIT {{0}}";
+            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, limit).ToListAsync(ct);
             return rows.Select(r => (r.message_id, r.score)).ToList();
         }
     }

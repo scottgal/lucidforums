@@ -51,10 +51,14 @@
             <label class="block text-sm font-medium">Replies per thread</label>
             <input id="RepliesPerThread" name="RepliesPerThread" type="number" value="2" min="0" max="20" class="border p-2 w-24" />
         </div>
+        <div class="flex items-center gap-2">
+            <input id="IncludeEmoticons" name="IncludeEmoticons" type="checkbox" class="checkbox" />
+            <label for="IncludeEmoticons" class="text-sm">Include emoticons 🙂 (optional)</label>
+        </div>
         <div class="flex-1 text-right">
             <button type="button" class="bg-emerald-600 text-white px-3 py-2 rounded" title="AI: Generate all & start"
                     hx-post="/Setup/GenAllAndStart" hx-target="#progress" hx-swap="innerHTML"
-                    hx-include="#ThreadCount,#RepliesPerThread,#setupForm input[name='__RequestVerificationToken']">One‑click Generate & Seed</button>
+                    hx-include="#ThreadCount,#RepliesPerThread,#IncludeEmoticons,#setupForm input[name='__RequestVerificationToken']">One‑click Generate & Seed</button>
         </div>
     </div>
     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Start Seeding</button>

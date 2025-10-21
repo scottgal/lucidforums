@@ -10,7 +10,8 @@ public record ForumSeedingRequest(
     int ThreadCount,
     int RepliesPerThread,
     string? SitePurpose = null,
-    string? CharterDescription = null
+    string? CharterDescription = null,
+    bool IncludeEmoticons = false
 );
 
 public record ForumSeedingProgress(
