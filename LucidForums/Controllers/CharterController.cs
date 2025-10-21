@@ -1,20 +1,18 @@
-﻿using LucidForums.Data;
-using LucidForums.Models.Entities;
+﻿using LucidForums.Models.Entities;
 using LucidForums.Models.ViewModels;
+using LucidForums.Services.Charters;
 using LucidForums.Web.Mapping;
-using Mapster;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LucidForums.Controllers;
 
-public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Controller
+public class CharterController(ICharterService charterService, IAppMapper mapper) : Controller
 {
     [HttpGet]
     [Route("Charters")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var items = await db.Charters.AsNoTracking().OrderBy(c => c.Name).ToListAsync(ct);
+        var items = await charterService.ListAsync(ct);
         var vms = mapper.ToCharterListItemVms(items);
         return View(vms);
     }
@@ -23,7 +21,7 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
     [Route("Charters/{id:guid}")]
     public async Task<IActionResult> Details(Guid id, CancellationToken ct)
     {
-        var charter = await db.Charters.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+        var charter = await charterService.GetByIdAsync(id, ct);
         if (charter == null) return NotFound();
         var vm = mapper.ToCharterDetailsVm(charter);
         return View(vm);
@@ -45,15 +43,9 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
         {
             return View(vm);
         }
-        var charter = new Charter
-        {
-            Name = vm.Name,
-            Purpose = vm.Purpose,
-            Rules = SplitLines(vm.RulesMultiline),
-            Behaviors = SplitLines(vm.BehaviorsMultiline)
-        };
-        db.Charters.Add(charter);
-        await db.SaveChangesAsync(ct);
+        var rules = SplitLines(vm.RulesMultiline);
+        var behaviors = SplitLines(vm.BehaviorsMultiline);
+        var charter = await charterService.CreateAsync(vm.Name, vm.Purpose, rules, behaviors, ct);
         return RedirectToAction(nameof(Details), new { id = charter.Id });
     }
 
@@ -61,7 +53,7 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
     [Route("Charters/Edit/{id:guid}")]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
-        var charter = await db.Charters.FirstOrDefaultAsync(c => c.Id == id, ct);
+        var charter = await charterService.GetByIdAsync(id, ct);
         if (charter == null) return NotFound();
         var vm = new CharterEditVm
         {
@@ -83,13 +75,10 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
         {
             return View(vm);
         }
-        var charter = await db.Charters.FirstOrDefaultAsync(c => c.Id == id, ct);
-        if (charter == null) return NotFound();
-        charter.Name = vm.Name;
-        charter.Purpose = vm.Purpose;
-        charter.Rules = SplitLines(vm.RulesMultiline);
-        charter.Behaviors = SplitLines(vm.BehaviorsMultiline);
-        await db.SaveChangesAsync(ct);
+        var rules = SplitLines(vm.RulesMultiline);
+        var behaviors = SplitLines(vm.BehaviorsMultiline);
+        var ok = await charterService.UpdateAsync(id, vm.Name, vm.Purpose, rules, behaviors, ct);
+        if (!ok) return NotFound();
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -97,7 +86,7 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
     [Route("Charters/Delete/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var charter = await db.Charters.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+        var charter = await charterService.GetByIdAsync(id, ct);
         if (charter == null) return NotFound();
         var vm = mapper.ToCharterDetailsVm(charter);
         return View(vm);
@@ -108,10 +97,8 @@ public class CharterController(ApplicationDbContext db, IAppMapper mapper) : Con
     [Route("Charters/Delete/{id:guid}")]
     public async Task<IActionResult> ConfirmDelete(Guid id, CancellationToken ct)
     {
-        var charter = await db.Charters.FirstOrDefaultAsync(c => c.Id == id, ct);
-        if (charter == null) return NotFound();
-        db.Charters.Remove(charter);
-        await db.SaveChangesAsync(ct);
+        var ok = await charterService.DeleteAsync(id, ct);
+        if (!ok) return NotFound();
         return RedirectToAction(nameof(Index));
     }
 

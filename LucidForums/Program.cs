@@ -1,11 +1,14 @@
+using LucidForums.Services.Charters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var services = builder.Services;
 // Add services to the container.
-builder.Services.AddControllersWithViews();
-
+services.AddControllersWithViews();
+services.AddRazorPages();
+services.AddRazorComponents();
 // Real-time updates via SignalR
 builder.Services.AddSignalR();
 
@@ -52,6 +55,10 @@ builder.Services.AddSingleton<LucidForums.Services.Ai.IImageAiService, LucidForu
 // Adapter for legacy IOllamaChatService usages
 builder.Services.AddSingleton<LucidForums.Services.Llm.IOllamaChatService, LucidForums.Services.Ai.OllamaChatAdapter>();
 
+// Seeding (background forum generator)
+builder.Services.AddSingleton<LucidForums.Services.Seeding.IForumSeedingQueue, LucidForums.Services.Seeding.ForumSeedingQueue>();
+builder.Services.AddHostedService<LucidForums.Services.Seeding.ForumSeedingHostedService>();
+
 // Moderation
 builder.Services.AddSingleton<LucidForums.Services.Moderation.IModerationService, LucidForums.Services.Moderation.ModerationService>();
 
@@ -64,6 +71,8 @@ builder.Services.AddScoped<LucidForums.Services.Forum.IForumService, LucidForums
 builder.Services.AddScoped<LucidForums.Services.Forum.IThreadService, LucidForums.Services.Forum.ThreadService>();
 builder.Services.AddScoped<LucidForums.Services.Forum.IMessageService, LucidForums.Services.Forum.MessageService>();
 builder.Services.AddScoped<LucidForums.Services.Forum.IThreadViewService, LucidForums.Services.Forum.ThreadViewService>();
+// Charter domain service
+builder.Services.AddScoped<ICharterService, CharterService>();
 
 // Mapster (mapping) configuration
 LucidForums.Web.Mapping.MapsterRegistration.Register(Mapster.TypeAdapterConfig.GlobalSettings);
@@ -97,6 +106,9 @@ app.UseAuthorization();
 
 app.MapStaticAssets();
 
+// Map attribute-routed API controllers
+app.MapControllers();
+
 app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}")
@@ -106,6 +118,7 @@ app.MapRazorPages();
 
 // Map SignalR hubs
 app.MapHub<LucidForums.Hubs.ForumHub>(LucidForums.Hubs.ForumHub.HubPath);
+app.MapHub<LucidForums.Hubs.SeedingHub>(LucidForums.Hubs.SeedingHub.HubPath);
 
 // Ensure database exists and vector extension/table
 using (var scope = app.Services.CreateScope())
