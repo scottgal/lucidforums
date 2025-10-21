@@ -16,12 +16,12 @@ public class RuntimeAppMapper : IAppMapper
         var messages = (src.Messages ?? Array.Empty<MessageView>())
             .Select(ToMessageVm)
             .ToList();
-        return new ThreadVm(src.Id, src.Title, src.ForumId, src.AuthorId, src.CreatedAtUtc, messages);
+        return new ThreadVm(src.Id, src.Title, src.ForumId, src.AuthorId, src.CreatedAtUtc, messages, src.CharterScore, src.Tags ?? Array.Empty<string>());
     }
 
     public MessageVm ToMessageVm(MessageView src)
     {
-        return new MessageVm(src.Id, src.ParentId, src.Content, src.AuthorId, src.CreatedAtUtc, src.Depth);
+        return new MessageVm(src.Id, src.ParentId, src.Content, src.AuthorId, src.CreatedAtUtc, src.Depth, src.CharterScore);
     }
 
     public ThreadSummaryVm ToThreadSummaryVm(ForumThread src)

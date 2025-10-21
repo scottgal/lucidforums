@@ -56,6 +56,17 @@ public class ApplicationDbContext : IdentityDbContext<User>
                 .HasForeignKey<ForumThread>(x => x.RootMessageId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Map tags as a PostgreSQL text[] array (supported by Npgsql)
+            try
+            {
+                e.Property(x => x.Tags).HasColumnType("text[]");
+            }
+            catch
+            {
+                // If the provider doesn't support arrays, leave as default; another provider-specific
+                // configuration or value converter can be added in the future.
+            }
         });
 
         // Message (Post)
@@ -74,8 +85,15 @@ public class ApplicationDbContext : IdentityDbContext<User>
                 .WithMany(u => u.MessagesCreated)
                 .HasForeignKey(x => x.CreatedById)
                 .OnDelete(DeleteBehavior.SetNull);
-            e.Property(x => x.Path).HasColumnType("ltree");
-            e.HasIndex(x => x.Path).HasMethod("gist");
+            try
+            {
+                e.Property(x => x.Path).HasColumnType("ltree");
+                e.HasIndex(x => x.Path).HasMethod("gist");
+            }
+            catch
+            {
+                // Non-PostgreSQL providers may not support ltree/gist; skip provider-specific config.
+            }
         });
 
         // ForumUser (membership)

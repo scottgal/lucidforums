@@ -21,9 +21,9 @@ public class EmbeddingOptions : IConfigSection
     public string? Endpoint { get; set; }
 }
 
-public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> options, Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> aiOptions, IServiceProvider serviceProvider, LucidForums.Services.Ai.IAiSettingsService aiSettings) : IEmbeddingService
+public class EmbeddingService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> options, Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> aiOptions, IServiceProvider serviceProvider, LucidForums.Services.Ai.IAiSettingsService aiSettings) : IEmbeddingService
 {
-    private readonly ApplicationDbContext _db = db;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly IHttpClientFactory _httpFactory = httpFactory;
     private readonly IOllamaEndpointProvider _ollama = ollama;
     private readonly Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> _embOptions = options;
@@ -134,45 +134,62 @@ public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFa
 
     public async Task IndexMessageAsync(Guid messageId, CancellationToken ct = default)
     {
-        var msg = await _db.Messages.AsNoTracking()
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var msg = await db.Messages.AsNoTracking()
             .Where(m => m.Id == messageId)
             .Select(m => new { m.Id, m.ForumThreadId, m.Content })
             .FirstOrDefaultAsync(ct);
         if (msg == null) return;
-        var thread = await _db.Threads.AsNoTracking().Where(t => t.Id == msg.ForumThreadId).Select(t => new { t.Id, t.ForumId }).FirstOrDefaultAsync(ct);
+        var thread = await db.Threads.AsNoTracking().Where(t => t.Id == msg.ForumThreadId).Select(t => new { t.Id, t.ForumId }).FirstOrDefaultAsync(ct);
         if (thread == null) return;
 
         var hash = ComputeHash(msg.Content);
 
         // check if already indexed with same hash
-        var existingHash = await _db.Database.ExecuteSqlRawAsync("SELECT 1 WHERE EXISTS (SELECT 1 FROM message_embeddings WHERE message_id = {0} AND content_hash = {1})", msg.Id, hash);
+        var existingHash = await db.Database.ExecuteSqlRawAsync("SELECT 1 WHERE EXISTS (SELECT 1 FROM message_embeddings WHERE message_id = {0} AND content_hash = {1})", msg.Id, hash);
         if (existingHash == 1) return;
 
         var emb = await EmbedAsync(msg.Content, ct);
+        if (emb == null || emb.Length == 0)
+        {
+            // Skip indexing if we couldn't obtain a valid embedding to avoid SQL errors like []::vector
+            return;
+        }
         var embLiteral = "[" + string.Join(",", emb.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
 
         // Upsert (inline the vector literal to avoid parameter cast issues with ::vector)
         var sql = $@"INSERT INTO message_embeddings (message_id, forum_id, thread_id, content_hash, embedding, created_at)
 VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {embLiteral}::vector, now())
 ON CONFLICT (message_id) DO UPDATE SET content_hash = excluded.content_hash, embedding = excluded.embedding, created_at = now();";
-        await _db.Database.ExecuteSqlRawAsync(sql, msg.Id, thread.ForumId, thread.Id, hash);
+        await db.Database.ExecuteSqlRawAsync(sql, msg.Id, thread.ForumId, thread.Id, hash);
     }
 
     public async Task<List<(Guid MessageId, double Score)>> SearchAsync(string query, Guid? forumId, int limit = 10, CancellationToken ct = default)
     {
         var emb = await EmbedAsync(query, ct);
+        if (emb == null || emb.Length == 0)
+        {
+            // No embedding available; return empty results gracefully
+            return new List<(Guid MessageId, double Score)>();
+        }
         var embLiteral = "[" + string.Join(",", emb.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
         string sql;
         if (forumId.HasValue)
         {
             sql = $@"SELECT message_id, (embedding <=> {embLiteral}::vector) AS score FROM message_embeddings WHERE forum_id = {{0}} ORDER BY embedding <=> {embLiteral}::vector ASC LIMIT {{1}}";
-            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, forumId.Value, limit).ToListAsync(ct);
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var rows = await db.Set<SearchRow>().FromSqlRaw(sql, forumId.Value, limit).ToListAsync(ct);
             return rows.Select(r => (r.message_id, r.score)).ToList();
         }
         else
         {
             sql = $@"SELECT message_id, (embedding <=> {embLiteral}::vector) AS score FROM message_embeddings ORDER BY embedding <=> {embLiteral}::vector ASC LIMIT {{0}}";
-            var rows = await _db.Set<SearchRow>().FromSqlRaw(sql, limit).ToListAsync(ct);
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var rows = await db.Set<SearchRow>().FromSqlRaw(sql, limit).ToListAsync(ct);
             return rows.Select(r => (r.message_id, r.score)).ToList();
         }
     }

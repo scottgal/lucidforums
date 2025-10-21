@@ -13,6 +13,7 @@ public class ForumSeedingHostedService(
     IForumSeedingQueue queue,
     IServiceScopeFactory scopeFactory,
     ITextAiService ai,
+    LucidForums.Services.Search.IEmbeddingService embeddings,
     IHubContext<SeedingHub> hub,
     ISeedingProgressStore progressStore
 ) : BackgroundService
@@ -74,7 +75,26 @@ public class ForumSeedingHostedService(
 
                 // Track titles we have already used during this seeding job to avoid duplicates
                 var usedTitles = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+                // Maintain embeddings of accepted titles to enforce semantic diversity
+                var titleEmbeddings = new System.Collections.Concurrent.ConcurrentBag<float[]>();
+                const double titleSimThreshold = 0.90; // higher = allow closer; 0.90 is a good balance
                 int uniqueSuffixSeq = 0;
+
+                static double CosineSim(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+                {
+                    double dot = 0, na = 0, nb = 0;
+                    int len = Math.Min(a.Length, b.Length);
+                    for (int i = 0; i < len; i++)
+                    {
+                        double x = a[i];
+                        double y = b[i];
+                        dot += x * y;
+                        na += x * x;
+                        nb += y * y;
+                    }
+                    if (na == 0 || nb == 0) return 0;
+                    return dot / (Math.Sqrt(na) * Math.Sqrt(nb));
+                }
 
                 for (int t = 0; t < job.ThreadCount; t++)
                 {
@@ -88,15 +108,37 @@ public class ForumSeedingHostedService(
                             // Generate a unique title with a few retries to avoid duplicates across concurrent tasks
                             string title = string.Empty;
                             string rawTitle = string.Empty;
-                            const int maxTitleAttempts = 5;
+                            const int maxTitleAttempts = 6;
+                            float[]? acceptedEmb = null;
                             for (int attempt = 0; attempt < maxTitleAttempts; attempt++)
                             {
                                 var varNote = attempt == 0 ? string.Empty : $" Please provide a distinctly different angle. Variation seed: {Guid.NewGuid():N}";
                                 var titlePrompt = $"Generate a realistic, catchy forum thread title for a forum named '{job.ForumName}'. Consider site purpose: '{job.SitePurpose ?? job.Description}'. Return only the title.{varNote}";
                                 rawTitle = await ai.GenerateAsync(seedCharter, titlePrompt, ct: stoppingToken);
                                 title = TrimLine(rawTitle, 120);
-                                if (usedTitles.TryAdd(title, 0))
+
+                                // Compute embedding and compare with previous titles to ensure semantic diversity
+                                float[]? emb = null;
+                                try { emb = await embeddings.EmbedAsync(title, stoppingToken); } catch { /* fall through if embedding not available */ }
+
+                                bool diverseEnough = true;
+                                if (emb is not null)
                                 {
+                                    var snapshot = titleEmbeddings.ToArray();
+                                    foreach (var prev in snapshot)
+                                    {
+                                        var sim = CosineSim(emb, prev);
+                                        if (sim >= titleSimThreshold)
+                                        {
+                                            diverseEnough = false;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (diverseEnough && usedTitles.TryAdd(title, 0))
+                                {
+                                    if (emb is not null) { titleEmbeddings.Add(emb); acceptedEmb = emb; }
                                     break;
                                 }
                             }
@@ -108,7 +150,7 @@ public class ForumSeedingHostedService(
                                 usedTitles.TryAdd(title, 0);
                             }
 
-                            var contentPrompt = $"Write an engaging opening post for a thread titled '{title}'. It should fit the forum purpose: '{job.SitePurpose ?? job.Description}'. 2-4 paragraphs, markdown allowed. Keep it under 250 words.";
+                            var contentPrompt = $"Write an engaging opening post for a thread titled '{title}'. It should fit the forum purpose: '{job.SitePurpose ?? job.Description}'. Start with a clear, natural-sounding question in the first sentence that invites answers. 2-4 short paragraphs, markdown allowed. Keep it under 250 words. Avoid sounding like marketing copy.";
                             var content = await ai.GenerateAsync(seedCharter, contentPrompt, ct: stoppingToken);
 
                             if (job.IncludeEmoticons)
@@ -126,17 +168,93 @@ public class ForumSeedingHostedService(
                             var thread = await threadService2.CreateAsync(forum.Id, TrimLine(title, 120), content, null, stoppingToken);
                             await Broadcast(job.JobId, "thread", $"Created thread '{thread.Title}' by {author}", thread.Id.ToString());
 
+                            // Generate discovery-friendly tags using AI (overwrite heuristic tags if successful)
+                            try
+                            {
+                                var tagsPrompt = $"Based on the thread title and opening post below, generate 3-7 concise tags that help users find this discussion. Use useful categories like topics, problem/intent, audience, and domain-specific keywords. Output ONLY a JSON array of lowercase strings, no explanations.\\n\\nTitle: '{thread.Title}'\\n\\nOpening post:\\n{TrimLine(content, 1000)}";
+                                var tagsJson = await ai.GenerateAsync(seedCharter, tagsPrompt, ct: stoppingToken);
+                                // Try parse JSON array of strings
+                                var tags = new List<string>();
+                                try
+                                {
+                                    using var doc = System.Text.Json.JsonDocument.Parse(tagsJson);
+                                    if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                    {
+                                        foreach (var el in doc.RootElement.EnumerateArray())
+                                        {
+                                            if (el.ValueKind == System.Text.Json.JsonValueKind.String)
+                                            {
+                                                var tag = el.GetString();
+                                                if (!string.IsNullOrWhiteSpace(tag)) tags.Add(tag!.Trim());
+                                            }
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // Fallback: split by commas/newlines
+                                    foreach (var part in tagsJson.Split(new[] { ',', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        var tag = part.Trim().Trim('#').Trim().ToLowerInvariant();
+                                        if (tag.Length > 0 && tag.Length <= 40) tags.Add(tag);
+                                    }
+                                }
+                                // Deduplicate and cap
+                                var finalTags = tags.Select(t => t.Trim().Trim('#').ToLowerInvariant())
+                                                    .Where(t => t.Length > 1)
+                                                    .Distinct()
+                                                    .Take(8)
+                                                    .ToList();
+                                if (finalTags.Count > 0)
+                                {
+                                    var db2 = tsp.GetRequiredService<LucidForums.Data.ApplicationDbContext>();
+                                    var trackedThread = await db2.Threads.FirstOrDefaultAsync(x => x.Id == thread.Id, stoppingToken);
+                                    if (trackedThread is not null)
+                                    {
+                                        trackedThread.Tags = finalTags;
+                                        await db2.SaveChangesAsync(stoppingToken);
+                                    }
+                                }
+                            }
+                            catch { }
+
+                            // Prepare list of prior messages to enable threaded, responsive replies
+                            var priorMessages = new List<(Guid Id, string Content)> { (thread.RootMessage.Id, thread.RootMessage.Content) };
+
                             // Replies (sequential within a thread to avoid DbContext contention)
                             for (int r = 0; r < job.RepliesPerThread; r++)
                             {
-                                var replyPrompt = $"Write a realistic forum reply to the thread titled '{thread.Title}'. 1-2 short paragraphs. Keep it conversational and varying opinions.";
+                                var rng = Random.Shared;
+                                // Choose a parent: usually the root, sometimes a prior reply
+                                (Guid Id, string Content) parent = priorMessages[0];
+                                if (priorMessages.Count > 1 && rng.NextDouble() < 0.6)
+                                {
+                                    // 60% chance to reply to a non-root prior message
+                                    var idx = rng.Next(1, priorMessages.Count);
+                                    parent = priorMessages[idx];
+                                }
+
+                                // Build a context-aware prompt that responds directly to the parent message
+                                var parentSnippet = TrimLine(parent.Content, 220);
+                                var rootSnippet = TrimLine(thread.RootMessage.Content, 220);
+                                string replyPrompt;
+                                if (parent.Id == thread.RootMessage.Id)
+                                {
+                                    replyPrompt = $"Write a realistic forum reply to the opening post in the thread '{thread.Title}'. Opening post: '{rootSnippet}'. Answer the question directly, add a new angle or example, and keep it conversational. 1-2 short paragraphs, under 120 words. Avoid repeating the question verbatim.";
+                                }
+                                else
+                                {
+                                    replyPrompt = $"Write a realistic forum reply that responds directly to this comment in the thread '{thread.Title}': '{parentSnippet}'. You may reference the opening post for context: '{rootSnippet}'. Acknowledge a specific point from the comment (you can quote a short phrase using >), then add value or a counterpoint. Keep it friendly and on-topic. 1-2 short paragraphs, under 120 words.";
+                                }
+
                                 var reply = await ai.GenerateAsync(seedCharter, replyPrompt, ct: stoppingToken);
                                 if (job.IncludeEmoticons)
                                 {
                                     reply = AddEmoticonsToText(reply);
                                 }
                                 var replyAuthor = RandomAuthor();
-                                var msg = await messageService2.ReplyAsync(thread.Id, null, reply, null, stoppingToken);
+                                var msg = await messageService2.ReplyAsync(thread.Id, parent.Id, reply, null, stoppingToken);
+                                priorMessages.Add((msg.Id, reply));
                                 await Broadcast(job.JobId, "reply", $"Reply by {replyAuthor}", msg.Id.ToString());
                             }
                         }

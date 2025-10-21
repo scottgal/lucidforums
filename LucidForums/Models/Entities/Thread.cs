@@ -16,6 +16,9 @@ public class ForumThread
     // Score (0-100) indicating how well this thread (title + root content) aligns with the forum's charter; null if not evaluated
     public double? CharterScore { get; set; }
 
+    // Centrally stored tags derived from the thread's content (title + root message)
+    public List<string> Tags { get; set; } = new();
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }
     public User? CreatedBy { get; set; }

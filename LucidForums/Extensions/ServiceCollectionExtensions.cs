@@ -83,6 +83,7 @@ public static class ServiceCollectionExtensions
         {
             var ep = sp.GetRequiredService<IOllamaEndpointProvider>();
             client.BaseAddress = ep.GetBaseAddress();
+            client.Timeout = TimeSpan.FromSeconds(360);
         });
 
         // Pluggable chat providers
@@ -114,7 +115,8 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddLucidForumsEmbedding(this IServiceCollection services)
     {
-        services.AddScoped<IEmbeddingService, EmbeddingService>();
+        // EmbeddingService is safe as a singleton (no captured DbContext); it creates scopes per call.
+        services.AddSingleton<IEmbeddingService, EmbeddingService>();
         return services;
     }
 

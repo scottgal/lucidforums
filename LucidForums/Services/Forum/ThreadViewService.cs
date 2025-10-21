@@ -32,8 +32,11 @@ public class ThreadViewService(LucidForums.Data.ApplicationDbContext db) : IThre
             m.Content,
             m.CreatedById,
             m.CreatedAtUtc,
-            GetDepth(m.Path)
+            GetDepth(m.Path),
+            m.CharterScore
         )).ToList();
+
+        var tags = (thread.Tags ?? new List<string>()).ToList();
 
         return new ThreadView(
             thread.Id,
@@ -41,7 +44,9 @@ public class ThreadViewService(LucidForums.Data.ApplicationDbContext db) : IThre
             thread.ForumId,
             thread.CreatedById,
             thread.CreatedAtUtc,
-            msgViews
+            msgViews,
+            thread.CharterScore,
+            tags
         );
     }
 }

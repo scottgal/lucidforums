@@ -17,8 +17,6 @@
     <ItemGroup>
       <Folder Include="API\" />
       <Folder Include="Areas\Admin\" />
-      <Folder Include="FormitableAdmin\EntityFramework\Models\" />
-      <Folder Include="FormitableAdmin\Models\" />
     </ItemGroup>
 
     <ItemGroup>

@@ -28,7 +28,9 @@ public static class MapsterRegistration
         // DTO -> VM (use existing ThreadViewService projections)
         config.NewConfig<MessageView, MessageVm>();
         config.NewConfig<ThreadView, ThreadVm>()
-            .Map(dest => dest.Messages, src => src.Messages);
+            .Map(dest => dest.Messages, src => src.Messages)
+            .Map(dest => dest.CharterScore, src => src.CharterScore)
+            .Map(dest => dest.Tags, src => src.Tags);
 
         // Commands -> Entities
         config.NewConfig<CreateThreadVm, (string Title, string Content)>()

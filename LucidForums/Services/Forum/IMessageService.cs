@@ -54,23 +54,12 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
         db.Entry(msg).Property(x => x.Path).IsModified = true;
         await db.SaveChangesAsync(ct);
 
-        // Extract tags and tone/charter advice, then append to content
+        // Extract tags and tone/charter advice, but do NOT modify message content
         try
         {
             var tags = await tagExtractor.ExtractAsync(msg.Content, 5, ct);
             var advice = await toneAdvisor.CreateAdviceAsync(msg.Content, ct);
-            if ((tags?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(advice))
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine(msg.Content);
-                sb.AppendLine();
-                sb.AppendLine("---");
-                if (!string.IsNullOrWhiteSpace(advice)) sb.AppendLine("Advice: " + advice);
-                if (tags is { Count: > 0 }) sb.AppendLine("Tags: " + string.Join(", ", tags.Select(t => "#" + t)));
-                msg.Content = sb.ToString();
-                db.Entry(msg).Property(x => x.Content).IsModified = true;
-                await db.SaveChangesAsync(ct);
-            }
+            // Intentionally ignored for now: we may store/display elsewhere in the future
         }
         catch { /* best-effort only */ }
 

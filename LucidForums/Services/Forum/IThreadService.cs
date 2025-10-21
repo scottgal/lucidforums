@@ -11,7 +11,7 @@ public interface IThreadService
     Task<List<ForumThread>> ListLatestAsync(int skip = 0, int take = 10, CancellationToken ct = default);
 }
 
-public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Search.IEmbeddingService embeddingService) : IThreadService
+public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor) : IThreadService
 {
     public Task<ForumThread?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -58,6 +58,20 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
         thread.RootMessageId = root.Id;
         db.Entry(thread).Property(x => x.RootMessageId).IsModified = true;
         await db.SaveChangesAsync(ct);
+
+        // Centrally generate and store tags based on title + content (best-effort)
+        try
+        {
+            var text = (title ?? string.Empty) + "\n\n" + (content ?? string.Empty);
+            var tags = await tagExtractor.ExtractAsync(text, maxTags: 8, ct);
+            if (tags is { Count: > 0 })
+            {
+                thread.Tags = tags.ToList();
+                db.Entry(thread).Property(x => x.Tags).IsModified = true;
+                await db.SaveChangesAsync(ct);
+            }
+        }
+        catch { }
 
         // Compute charter scores (best-effort)
         try

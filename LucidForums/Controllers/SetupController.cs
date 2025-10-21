@@ -116,11 +116,11 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GenAllAndStart([FromForm] int ThreadCount = 3, [FromForm] int RepliesPerThread = 2, [FromForm] bool IncludeEmoticons = false, CancellationToken ct = default)
+    public async Task<IActionResult> GenAllAndStart([FromForm] int ThreadCount = 3, [FromForm] int RepliesPerThread = 2, [FromForm] bool IncludeEmoticons = true, CancellationToken ct = default)
     {
         // Generate sensible defaults
         var charter = new LucidForums.Models.Entities.Charter { Name = "Forum Setup", Purpose = "Generate forum seed" };
-        var name = await ai.GenerateAsync(charter, "Suggest a concise, appealing forum name. Make it appeal to a western adult male geek in his early 50s. Return only the name.", ct: ct);
+        var name = await ai.GenerateAsync(charter, "Suggest a concise, appealing forum name. Make it niche and fun avoiding any controversial topics. Return only the name.", ct: ct);
         var forumName = string.IsNullOrWhiteSpace(name) ? "Dreamers Hub" : name.Trim();
         var desc = await ai.GenerateAsync(new LucidForums.Models.Entities.Charter { Name = forumName, Purpose = "Description" }, $"One-sentence description for '{forumName}', under 160 chars.", ct: ct);
         var sitePurpose = await ai.GenerateAsync(new LucidForums.Models.Entities.Charter { Name = forumName, Purpose = "Purpose" }, $"Short phrase describing the site purpose for '{forumName}'.", ct: ct);

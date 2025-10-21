@@ -1,8 +1,8 @@
 ﻿namespace LucidForums.Models.ViewModels;
 
-public record MessageVm(Guid Id, Guid? ParentId, string Content, string? AuthorId, DateTime CreatedAtUtc, int Depth);
+public record MessageVm(Guid Id, Guid? ParentId, string Content, string? AuthorId, DateTime CreatedAtUtc, int Depth, double? CharterScore);
 
-public record ThreadVm(Guid Id, string Title, Guid ForumId, string? AuthorId, DateTime CreatedAtUtc, IReadOnlyList<MessageVm> Messages);
+public record ThreadVm(Guid Id, string Title, Guid ForumId, string? AuthorId, DateTime CreatedAtUtc, IReadOnlyList<MessageVm> Messages, double? CharterScore, IReadOnlyList<string> Tags);
 
 public class CreateThreadVm
 {
