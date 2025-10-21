@@ -5,29 +5,110 @@ using LucidForums.Data;
 using LucidForums.Models.Entities;
 using LucidForums.Services.Llm;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 
 namespace LucidForums.Services.Search;
 
-public class EmbeddingOptions
+using LucidForums.Helpers;
+
+public class EmbeddingOptions : IConfigSection
 {
+    public static string Section => "Embedding";
     public string? Model { get; set; } = "mxbai-embed-large"; // sensible default for Ollama
+    // Provider can be "ollama" (default) or "lmstudio" (OpenAI-compatible)
+    public string Provider { get; set; } = "ollama";
+    // When using LMStudio, base endpoint (e.g., http://localhost:1234). If null, defaults to localhost:1234
+    public string? Endpoint { get; set; }
 }
 
-public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptions<EmbeddingOptions> options) : IEmbeddingService
+public class EmbeddingService(ApplicationDbContext db, IHttpClientFactory httpFactory, IOllamaEndpointProvider ollama, Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> options, Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> aiOptions, IServiceProvider serviceProvider) : IEmbeddingService
 {
     private readonly ApplicationDbContext _db = db;
     private readonly IHttpClientFactory _httpFactory = httpFactory;
     private readonly IOllamaEndpointProvider _ollama = ollama;
-    private readonly EmbeddingOptions _options = options.Value;
+    private readonly Microsoft.Extensions.Options.IOptionsMonitor<EmbeddingOptions> _embOptions = options;
+    private readonly Microsoft.Extensions.Options.IOptionsMonitor<LucidForums.Services.Ai.AiOptions> _aiOptions = aiOptions;
+    private readonly IServiceProvider _sp = serviceProvider;
 
     public async Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
-        var model = string.IsNullOrWhiteSpace(_options.Model) ? "mxbai-embed-large" : _options.Model!;
-        var client = _httpFactory.CreateClient("ollama");
-        using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(_ollama.GetBaseAddress(), "/api/embeddings"))
+        var opts = _embOptions.CurrentValue;
+        var model = string.IsNullOrWhiteSpace(opts.Model) ? "mxbai-embed-large" : opts.Model!;
+        var provider = (opts.Provider ?? "ollama").Trim().ToLowerInvariant();
+
+        // Prefer Microsoft.Extensions.AI embedding generator if available (for OpenAI-compatible providers like LM Studio/OpenAI)
+        var genObj = _sp.GetService(typeof(IEmbeddingGenerator<string, Embedding<float>>));
+        if (genObj is not null && (provider == "openai" || provider == "lmstudio"))
         {
-            Content = new StringContent(JsonSerializer.Serialize(new { model, input = text }), Encoding.UTF8, "application/json")
+            try
+            {
+                dynamic dynGen = genObj;
+                try
+                {
+                    dynamic embedding = await dynGen.GenerateEmbeddingAsync(text, ct);
+                    var vecObj = embedding.Vector;
+                    if (vecObj is float[] arr) return arr;
+                    if (vecObj is ReadOnlyMemory<float> rom) return rom.ToArray();
+                    if (vecObj is Memory<float> mem) return mem.ToArray();
+                    if (vecObj is IReadOnlyList<float> list) return list.ToArray();
+                    if (vecObj is IEnumerable<float> en) return en.ToArray();
+                }
+                catch
+                {
+                    dynamic embedding = await dynGen.GenerateAsync(text, ct);
+                    var vecObj = embedding.Vector;
+                    if (vecObj is float[] arr) return arr;
+                    if (vecObj is ReadOnlyMemory<float> rom) return rom.ToArray();
+                    if (vecObj is Memory<float> mem) return mem.ToArray();
+                    if (vecObj is IReadOnlyList<float> list) return list.ToArray();
+                    if (vecObj is IEnumerable<float> en) return en.ToArray();
+                }
+            }
+            catch
+            {
+                // fall back to HTTP flow below
+            }
+        }
+
+        var client = _httpFactory.CreateClient("ollama");
+
+        Uri requestUri;
+        object payload;
+
+        if (provider == "lmstudio")
+        {
+            var baseUrl = string.IsNullOrWhiteSpace(opts.Endpoint) ? "http://localhost:1234" : opts.Endpoint!;
+            if (!baseUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) baseUrl = "http://" + baseUrl;
+            var baseUri = new Uri(baseUrl);
+            requestUri = new Uri(baseUri, "/v1/embeddings");
+            payload = new { model, input = text };
+        }
+        else if (provider == "openai")
+        {
+            var baseUrl = string.IsNullOrWhiteSpace(opts.Endpoint) ? "https://api.openai.com" : opts.Endpoint!;
+            var baseUri = new Uri(baseUrl);
+            requestUri = new Uri(baseUri, "/v1/embeddings");
+            payload = new { model, input = text };
+        }
+        else
+        {
+            requestUri = new Uri(_ollama.GetBaseAddress(), "/api/embeddings");
+            payload = new { model, input = text };
+        }
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
+        if (provider == "openai")
+        {
+            var ai = _aiOptions.CurrentValue;
+            var key = ai.ApiKey;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+            }
+        }
         using var resp = await client.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         var json = await resp.Content.ReadAsStringAsync(ct);

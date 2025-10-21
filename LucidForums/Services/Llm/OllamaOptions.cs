@@ -1,7 +1,10 @@
+using LucidForums.Helpers;
+
 namespace LucidForums.Services.Llm;
 
-public class OllamaOptions
+public class OllamaOptions : IConfigSection
 {
+    public static string Section => "Ollama";
     // Base endpoint, e.g., http://ollama:11434 (in Docker) or http://localhost:11434 (local)
     public string Endpoint { get; set; } = "http://localhost:11434";
 

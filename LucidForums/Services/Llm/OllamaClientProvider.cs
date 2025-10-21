@@ -8,9 +8,9 @@ public interface IOllamaEndpointProvider
     OllamaOptions Options { get; }
 }
 
-public class OllamaEndpointProvider(IOptions<OllamaOptions> options) : IOllamaEndpointProvider
+public class OllamaEndpointProvider(OllamaOptions options) : IOllamaEndpointProvider
 {
-    private readonly OllamaOptions _options = options.Value;
+    private readonly OllamaOptions _options = options;
     private Uri? _baseUri;
 
     public Uri GetBaseAddress()
