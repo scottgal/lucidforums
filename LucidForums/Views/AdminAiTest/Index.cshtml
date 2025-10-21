@@ -1,0 +1,95 @@
+﻿@model LucidForums.Controllers.AdminAiTestController.IndexVm
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<div class="prose max-w-none">
+    <h1>Admin AI Test</h1>
+    <p class="text-base-content/70">Use this page to test AI interactions with charters and forum thread context.</p>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Run Prompt Against Charter</h2>
+            <form method="post" asp-action="Run">
+                @Html.AntiForgeryToken()
+                <div class="form-control">
+                    <label class="label">Charter</label>
+                    <select name="CharterId" class="select select-bordered w-full max-w-xl">
+                        <option value="">(Default: General Assistant)</option>
+                        @foreach (var c in Model.CharterOptions)
+                        {
+                            <option value="@c.Id" selected="@(Model.SelectedCharterId == c.Id)">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model (optional)</label>
+                    <input name="ModelName" value="@Model.ModelName" class="input input-bordered w-full max-w-xl" placeholder="e.g. llama3.1:8b or leave blank" />
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Prompt</label>
+                    <textarea name="Prompt" class="textarea textarea-bordered w-full h-40" placeholder="Type your prompt here...">@Model.Prompt</textarea>
+                </div>
+                <div class="mt-4">
+                    <button class="btn btn-primary" type="submit">Run</button>
+                </div>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.Output))
+            {
+                <div class="mt-4">
+                    <div class="label">Output</div>
+                    <pre class="whitespace-pre-wrap bg-base-200 p-4 rounded">@Model.Output</pre>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Suggest Reply From Thread Context</h2>
+            <form method="post" asp-action="SuggestReply">
+                @Html.AntiForgeryToken()
+                <div class="form-control">
+                    <label class="label">Thread Id</label>
+                    <input name="ThreadId" value="@Model.ThreadId" class="input input-bordered w-full max-w-xl" placeholder="Paste a Thread GUID" />
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Context Messages</label>
+                    <input type="number" name="ContextMessageLimit" value="@Model.ContextMessageLimit" min="1" max="25" class="input input-bordered w-40" />
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Charter (optional)</label>
+                    <select name="CharterId" class="select select-bordered w-full max-w-xl">
+                        <option value="">(Default: Forum Reply Assistant)</option>
+                        @foreach (var c in Model.CharterOptions)
+                        {
+                            <option value="@c.Id" selected="@(Model.SelectedCharterId == c.Id)">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Additional Instruction (optional)</label>
+                    <textarea name="Prompt" class="textarea textarea-bordered w-full h-32" placeholder="Optional guidance to the assistant...">@Model.Prompt</textarea>
+                </div>
+                <div class="mt-4">
+                    <button class="btn" type="submit">Suggest Reply</button>
+                </div>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.ReplySuggestion))
+            {
+                <div class="mt-4">
+                    <div class="label">Suggested Reply</div>
+                    <pre class="whitespace-pre-wrap bg-base-200 p-4 rounded">@Model.ReplySuggestion</pre>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-error mt-6">
+        <span>@Model.Error</span>
+    </div>
+}
