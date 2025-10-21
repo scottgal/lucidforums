@@ -106,21 +106,7 @@ public class AdminAiSettingsController(IAiSettingsService settings, IEnumerable<
         vm.TranslationModels = await Load(vm.TranslationProvider);
         vm.EmbeddingModels = await Load(vm.EmbeddingProvider);
 
-        // If HTMX request, return only the relevant partial
-        var isHtmx = Request.Headers.ContainsKey("HX-Request");
-        if (isHtmx)
-        {
-            var section = (req.Section ?? string.Empty).ToLowerInvariant();
-            return section switch
-            {
-                "generation" => PartialView("_Generation", vm),
-                "translation" => PartialView("_Translation", vm),
-                "embedding" => PartialView("_Embedding", vm),
-                _ => PartialView("_Generation", vm)
-            };
-        }
-
-        // Fallback full page
+        // Always return full page with consolidated Save
         return View("Index", vm);
     }
 

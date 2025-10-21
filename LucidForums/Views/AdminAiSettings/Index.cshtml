@@ -14,6 +14,14 @@
         </form>
     </div>
 </div>
+@if (TempData["Message"] is string tmsg && !string.IsNullOrWhiteSpace(tmsg))
+{
+    <div class="alert alert-success my-3">@tmsg</div>
+}
+@if (TempData["Error"] is string terr && !string.IsNullOrWhiteSpace(terr))
+{
+    <div class="alert alert-error my-3">@terr</div>
+}
 @if (!string.IsNullOrWhiteSpace(Model.Message))
 {
     <div class="alert alert-success my-3">@Model.Message</div>
@@ -22,10 +30,85 @@
 {
     <div class="alert alert-error my-3">@Model.Error</div>
 }
-<div class="grid-3col-lg">
-    @await Html.PartialAsync("_Generation", Model)
-    @await Html.PartialAsync("_Translation", Model)
-    @await Html.PartialAsync("_Embedding", Model)
-</div>
+<form method="post" action="/Admin/AiSettings/Save">
+    @Html.AntiForgeryToken()
+    <div class="grid-3col-lg">
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">Generation</h2>
+                <div class="form-control">
+                    <label class="label">Provider</label>
+                    <select name="GenerationProvider" class="select select-bordered w-full">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.GenerationProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="GenerationModel" class="select select-bordered w-full">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.GenerationModels)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.GenerationModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">Translation</h2>
+                <div class="form-control">
+                    <label class="label">Provider</label>
+                    <select name="TranslationProvider" class="select select-bordered w-full">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.TranslationProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="TranslationModel" class="select select-bordered w-full">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.TranslationModels)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.TranslationModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">Embeddings</h2>
+                <div class="form-control">
+                    <label class="label">Provider</label>
+                    <select name="EmbeddingProvider" class="select select-bordered w-full">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.EmbeddingProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="EmbeddingModel" class="select select-bordered w-full">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.EmbeddingModels)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.EmbeddingModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-6">
+        <button class="btn btn-primary" type="submit">Save All</button>
+    </div>
+</form>
 @section Scripts {
 }

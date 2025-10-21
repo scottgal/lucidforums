@@ -1,0 +1,39 @@
+﻿@model LucidForums.Controllers.AdminAiSettingsController.IndexVm
+<div id="trCard" class="card bg-base-100 shadow" x-data="{saving:false}">
+    <div class="card-body">
+        <h2 class="card-title">Translation</h2>
+        <form method="post" asp-action="Save" hx-post="/Admin/AiSettings/Save" hx-target="#trCard" hx-swap="outerHTML" x-on:submit="saving=true">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="section" value="translation" />
+            <input type="hidden" name="GenerationProvider" value="@Model.GenerationProvider" />
+            <input type="hidden" name="GenerationModel" value="@Model.GenerationModel" />
+            <input type="hidden" name="EmbeddingProvider" value="@Model.EmbeddingProvider" />
+            <input type="hidden" name="EmbeddingModel" value="@Model.EmbeddingModel" />
+            @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success my-2">@Model.Message</div> }
+            @if (!string.IsNullOrWhiteSpace(Model.Error)) { <div class="alert alert-error my-2">@Model.Error</div> }
+            <div class="form-control">
+                <label class="label">Provider</label>
+                <select name="TranslationProvider" id="trProvider" class="select select-bordered w-full">
+                    @foreach (var p in Model.Providers)
+                    {
+                        <option value="@p" selected="@(string.Equals(Model.TranslationProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                    }
+                </select>
+            </div>
+            <div class="form-control mt-3">
+                <label class="label">Model</label>
+                <select name="TranslationModel" id="trModel" class="select select-bordered w-full">
+                    <option value="">(Default)</option>
+                    @foreach (var m in Model.TranslationModels)
+                    {
+                        <option value="@m" selected="@(string.Equals(Model.TranslationModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                    }
+                </select>
+            </div>
+            <div class="mt-4 flex items-center gap-2">
+                <button class="btn btn-primary" type="submit" :class="{'btn-disabled loading': saving}">Save</button>
+                <span class="loading loading-spinner" x-show="saving"></span>
+            </div>
+        </form>
+    </div>
+</div>

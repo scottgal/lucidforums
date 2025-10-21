@@ -1,0 +1,22 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var msg = TempData["Message"] as string;
+}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Admin Tools</h1>
+    @if (!string.IsNullOrWhiteSpace(msg))
+    {
+        <div class="alert alert-success mb-4">@msg</div>
+    }
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Clear Forum Content</h2>
+            <p class="text-sm opacity-80">This will delete all forums, threads, messages, forum memberships, and search embeddings. It will NOT change AI/LLM settings or user accounts.</p>
+            <form method="post" asp-controller="Admin" asp-action="ClearContent" onsubmit="return confirm('Are you sure you want to delete all forum content? This cannot be undone.');">
+                <button type="submit" class="btn btn-error">Clear DB Content</button>
+                @Html.AntiForgeryToken()
+            </form>
+        </div>
+    </div>
+</div>
