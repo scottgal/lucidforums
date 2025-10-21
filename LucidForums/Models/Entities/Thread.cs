@@ -9,9 +9,9 @@ public class ForumThread
 
     public string Title { get; set; } = string.Empty;
 
-    // Root message of the thread
-    public Guid RootMessageId { get; set; }
-    public Message RootMessage { get; set; } = null!;
+    // Root message of the thread (nullable to avoid circular insert FK issues)
+    public Guid? RootMessageId { get; set; }
+    public Message? RootMessage { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }

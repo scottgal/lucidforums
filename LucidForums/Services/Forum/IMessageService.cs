@@ -1,4 +1,6 @@
-﻿using LucidForums.Models.Entities;
+﻿using System.Text;
+using System.Linq;
+using LucidForums.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace LucidForums.Services.Forum;
@@ -10,7 +12,7 @@ public interface IMessageService
     Task<List<Message>> ListByThreadAsync(Guid threadId, CancellationToken ct = default);
 }
 
-public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService) : IMessageService
+public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, LucidForums.Services.Analysis.IToneAdvisor toneAdvisor) : IMessageService
 {
     public Task<Message?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -51,6 +53,26 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
         msg.Path = string.IsNullOrEmpty(parentPath) ? msg.Id.ToString("N") : parentPath + "." + msg.Id.ToString("N");
         db.Entry(msg).Property(x => x.Path).IsModified = true;
         await db.SaveChangesAsync(ct);
+
+        // Extract tags and tone/charter advice, then append to content
+        try
+        {
+            var tags = await tagExtractor.ExtractAsync(msg.Content, 5, ct);
+            var advice = await toneAdvisor.CreateAdviceAsync(msg.Content, ct);
+            if ((tags?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(advice))
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine(msg.Content);
+                sb.AppendLine();
+                sb.AppendLine("---");
+                if (!string.IsNullOrWhiteSpace(advice)) sb.AppendLine("Advice: " + advice);
+                if (tags is { Count: > 0 }) sb.AppendLine("Tags: " + string.Join(", ", tags.Select(t => "#" + t)));
+                msg.Content = sb.ToString();
+                db.Entry(msg).Property(x => x.Content).IsModified = true;
+                await db.SaveChangesAsync(ct);
+            }
+        }
+        catch { /* best-effort only */ }
 
         // Fire-and-forget indexing (do not block reply creation)
         _ = Task.Run(async () =>

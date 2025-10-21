@@ -35,6 +35,7 @@
                         <div tabindex="0" role="button" class="btn btn-ghost">@User.Identity?.Name</div>
                         <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
                             <li><a asp-area="Identity" asp-page="/Account/Manage/Index">Manage account</a></li>
+                            <li><a asp-area="" asp-controller="Admin" asp-action="Tools">Admin tools</a></li>
                             <li>
                                 <form method="post" asp-area="Identity" asp-page="/Account/Logout">
                                     <button type="submit">Sign out</button>

@@ -62,7 +62,8 @@ public class AdminAiSettingsController(IAiSettingsService settings, IEnumerable<
     public record SaveRequest(
         string? GenerationProvider, string? GenerationModel,
         string? TranslationProvider, string? TranslationModel,
-        string? EmbeddingProvider, string? EmbeddingModel
+        string? EmbeddingProvider, string? EmbeddingModel,
+        string? Section
     );
 
     [HttpPost]
@@ -79,16 +80,48 @@ public class AdminAiSettingsController(IAiSettingsService settings, IEnumerable<
         settings.TranslationModel = string.IsNullOrWhiteSpace(req.TranslationModel) ? null : req.TranslationModel;
         settings.EmbeddingModel = string.IsNullOrWhiteSpace(req.EmbeddingModel) ? null : req.EmbeddingModel;
 
-        // Reload models and show message
-        return await Index(ct).ContinueWith<IActionResult>(t =>
+        var provs = providers.Select(p => p.Name).ToList();
+        async Task<List<string>> Load(string? p)
         {
-            if (t.Result is ViewResult vr && vr.Model is IndexVm vm)
+            if (string.IsNullOrWhiteSpace(p)) return new();
+            var pr = providers.FirstOrDefault(x => string.Equals(x.Name, p, StringComparison.OrdinalIgnoreCase));
+            if (pr == null) return new();
+            var models = await pr.ListModelsAsync(ct);
+            return models.ToList();
+        }
+
+        // Reload models and show message
+        var vm = new IndexVm
+        {
+            Providers = provs,
+            GenerationProvider = settings.GenerationProvider,
+            TranslationProvider = settings.TranslationProvider,
+            EmbeddingProvider = settings.EmbeddingProvider,
+            GenerationModel = settings.GenerationModel,
+            TranslationModel = settings.TranslationModel,
+            EmbeddingModel = settings.EmbeddingModel,
+            Message = "Settings saved."
+        };
+        vm.GenerationModels = await Load(vm.GenerationProvider);
+        vm.TranslationModels = await Load(vm.TranslationProvider);
+        vm.EmbeddingModels = await Load(vm.EmbeddingProvider);
+
+        // If HTMX request, return only the relevant partial
+        var isHtmx = Request.Headers.ContainsKey("HX-Request");
+        if (isHtmx)
+        {
+            var section = (req.Section ?? string.Empty).ToLowerInvariant();
+            return section switch
             {
-                vm.Message = "Settings saved.";
-                return View("Index", vm);
-            }
-            return RedirectToAction("Index");
-        });
+                "generation" => PartialView("_Generation", vm),
+                "translation" => PartialView("_Translation", vm),
+                "embedding" => PartialView("_Embedding", vm),
+                _ => PartialView("_Generation", vm)
+            };
+        }
+
+        // Fallback full page
+        return View("Index", vm);
     }
 
     [HttpGet]

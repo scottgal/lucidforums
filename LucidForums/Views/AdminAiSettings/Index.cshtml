@@ -6,9 +6,13 @@
 <div class="prose-header">
     <h1>AI Settings</h1>
     <p class="text-base-content/70">Choose which AI provider and model to use for generation, translation, and embeddings.</p>
-    <p class="mt-2">
+    <div class="mt-2 flex gap-2 flex-wrap">
         <a class="btn btn-sm btn-accent" href="/Setup" title="Use AI to generate realistic sample content">Populate the site</a>
-    </p>
+        <form method="post" action="/Admin/ClearContent" onsubmit="return confirm('This will delete all forums, threads, messages, memberships, and embeddings. Settings and users are preserved. Are you sure?');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-sm btn-error" title="Delete all content (forums, threads, messages, embeddings)">Clear data</button>
+        </form>
+    </div>
 </div>
 @if (!string.IsNullOrWhiteSpace(Model.Message))
 {
@@ -19,108 +23,9 @@
     <div class="alert alert-error my-3">@Model.Error</div>
 }
 <div class="grid-3col-lg">
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Generation</h2>
-            <form method="post" asp-action="Save">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="TranslationProvider" value="@Model.TranslationProvider" />
-                <input type="hidden" name="TranslationModel" value="@Model.TranslationModel" />
-                <input type="hidden" name="EmbeddingProvider" value="@Model.EmbeddingProvider" />
-                <input type="hidden" name="EmbeddingModel" value="@Model.EmbeddingModel" />
-                <div class="form-control">
-                    <label class="label">Provider</label>
-                    <select name="GenerationProvider" id="genProvider" class="select select-bordered w-full">
-                        @foreach (var p in Model.Providers)
-                        {
-                            <option value="@p" selected="@(string.Equals(Model.GenerationProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-control mt-3">
-                    <label class="label">Model</label>
-                    <select name="GenerationModel" id="genModel" class="select select-bordered w-full">
-                        <option value="">(Default)</option>
-                        @foreach (var m in Model.GenerationModels)
-                        {
-                            <option value="@m" selected="@(string.Equals(Model.GenerationModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
-                        }
-                    </select>
-                </div>
-                <div class="mt-4">
-                    <button class="btn btn-primary" type="submit">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Translation</h2>
-            <form method="post" asp-action="Save">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="GenerationProvider" value="@Model.GenerationProvider" />
-                <input type="hidden" name="GenerationModel" value="@Model.GenerationModel" />
-                <input type="hidden" name="EmbeddingProvider" value="@Model.EmbeddingProvider" />
-                <input type="hidden" name="EmbeddingModel" value="@Model.EmbeddingModel" />
-                <div class="form-control">
-                    <label class="label">Provider</label>
-                    <select name="TranslationProvider" id="trProvider" class="select select-bordered w-full">
-                        @foreach (var p in Model.Providers)
-                        {
-                            <option value="@p" selected="@(string.Equals(Model.TranslationProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-control mt-3">
-                    <label class="label">Model</label>
-                    <select name="TranslationModel" id="trModel" class="select select-bordered w-full">
-                        <option value="">(Default)</option>
-                        @foreach (var m in Model.TranslationModels)
-                        {
-                            <option value="@m" selected="@(string.Equals(Model.TranslationModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
-                        }
-                    </select>
-                </div>
-                <div class="mt-4">
-                    <button class="btn btn-primary" type="submit">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Embeddings</h2>
-            <form method="post" asp-action="Save">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="GenerationProvider" value="@Model.GenerationProvider" />
-                <input type="hidden" name="GenerationModel" value="@Model.GenerationModel" />
-                <input type="hidden" name="TranslationProvider" value="@Model.TranslationProvider" />
-                <input type="hidden" name="TranslationModel" value="@Model.TranslationModel" />
-                <div class="form-control">
-                    <label class="label">Provider</label>
-                    <select name="EmbeddingProvider" id="embProvider" class="select select-bordered w-full">
-                        @foreach (var p in Model.Providers)
-                        {
-                            <option value="@p" selected="@(string.Equals(Model.EmbeddingProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-control mt-3">
-                    <label class="label">Model</label>
-                    <select name="EmbeddingModel" id="embModel" class="select select-bordered w-full">
-                        <option value="">(Default)</option>
-                        @foreach (var m in Model.EmbeddingModels)
-                        {
-                            <option value="@m" selected="@(string.Equals(Model.EmbeddingModel, m, StringComparison.OrdinalIgnoreCase))">@m</option>
-                        }
-                    </select>
-                </div>
-                <div class="mt-4">
-                    <button class="btn btn-primary" type="submit">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    @await Html.PartialAsync("_Generation", Model)
+    @await Html.PartialAsync("_Translation", Model)
+    @await Html.PartialAsync("_Embedding", Model)
 </div>
 @section Scripts {
 }

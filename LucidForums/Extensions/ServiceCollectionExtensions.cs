@@ -10,8 +10,11 @@ using LucidForums.Services.Moderation;
 using LucidForums.Services.Observability;
 using LucidForums.Services.Search;
 using LucidForums.Services.Seeding;
+using LucidForums.Services.Admin;
+using LucidForums.Services.Analysis;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -36,6 +39,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddLucidForumsDatabase(this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Register the primary DbContext for scoped usage (web requests)
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             var cs = configuration.GetConnectionString("Default")
@@ -59,7 +63,10 @@ public static class ServiceCollectionExtensions
 
             // Always use PostgreSQL (Npgsql)
             options.UseNpgsql(cs);
-        });
+        }, contextLifetime: ServiceLifetime.Scoped, optionsLifetime: ServiceLifetime.Singleton);
+
+        // Also register a DbContext factory for singletons/background services
+        services.AddDbContextFactory<ApplicationDbContext>();
 
         services.AddIdentity<User, IdentityRole>(options => { options.SignIn.RequireConfirmedAccount = false; })
             .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -118,6 +125,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMessageService, MessageService>();
         services.AddScoped<IThreadViewService, ThreadViewService>();
         services.AddScoped<ICharterService, CharterService>();
+        services.AddScoped<IAdminMaintenanceService, AdminMaintenanceService>();
+        // Analysis helpers (tags and tone advice)
+        services.AddScoped<ITagExtractionService, TagExtractionService>();
+        services.AddScoped<IToneAdvisor, ToneAdvisor>();
         return services;
     }
 

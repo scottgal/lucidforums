@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<User>
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Charter> Charters => Set<Charter>();
     public DbSet<ForumUser> ForumUsers => Set<ForumUser>();
+    public DbSet<AppSettings> AppSettings => Set<AppSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +54,7 @@ public class ApplicationDbContext : IdentityDbContext<User>
             e.HasOne(x => x.RootMessage)
                 .WithOne()
                 .HasForeignKey<ForumThread>(x => x.RootMessageId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -117,6 +119,12 @@ public class ApplicationDbContext : IdentityDbContext<User>
                     Behaviors = new List<string> { "Encourage collaboration", "Offer actionable suggestions", "Celebrate progress" }
                 }
             );
+        });
+
+        // AppSettings single-row configuration
+        modelBuilder.Entity<AppSettings>(e =>
+        {
+            e.HasKey(x => x.Id);
         });
 
         // Enable PostgreSQL ltree extension if using Npgsql

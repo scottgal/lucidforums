@@ -64,6 +64,20 @@ public static class ApplicationBuilderExtensions
                 NULL;
         END $$;");
 
+            // Ensure Threads.RootMessageId is nullable (for existing PostgreSQL schemas created before the fix)
+            // Safe to run multiple times; no-op if already nullable or table missing.
+            db.Database.ExecuteSqlRaw(@"DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'Threads' AND column_name = 'RootMessageId'
+            ) THEN
+                EXECUTE 'ALTER TABLE ""Threads"" ALTER COLUMN ""RootMessageId"" DROP NOT NULL';
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore any errors (e.g., insufficient privileges, SQLite provider, etc.)
+            NULL;
+        END $$;");
+
             // Create embeddings table
             db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS message_embeddings (
             message_id uuid PRIMARY KEY,
@@ -81,6 +95,21 @@ public static class ApplicationBuilderExtensions
             -- ignore if cannot create (e.g., extension not supporting ivfflat); sequential scan will be used
             NULL;
         END $$;");
+
+            // Ensure AppSettings table exists (case-sensitive EF Core default) and has a single row with Id=1
+            db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""AppSettings"" (
+                ""Id"" integer PRIMARY KEY,
+                ""GenerationProvider"" text NULL,
+                ""GenerationModel"" text NULL,
+                ""TranslationProvider"" text NULL,
+                ""TranslationModel"" text NULL,
+                ""EmbeddingProvider"" text NULL,
+                ""EmbeddingModel"" text NULL
+            )");
+            // Insert default row if absent
+            db.Database.ExecuteSqlRaw(@"INSERT INTO ""AppSettings"" (""Id"", ""GenerationProvider"", ""GenerationModel"", ""TranslationProvider"", ""TranslationModel"", ""EmbeddingProvider"", ""EmbeddingModel"")
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL)
+            ON CONFLICT (""Id"") DO NOTHING;");
         }
         catch
         {

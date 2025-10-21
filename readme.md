@@ -1,5 +1,12 @@
 # Forum/Chat Hybrid Platform
 
+# A VIBE CODING EXPERIMENT...
+
+The main purpose of this is so I get to experiment with just how much I can do with vibe coding. It seemed appropriate that this would be a Local LLM based forum system to see how that technology can work. 
+
+> [!WARNING]
+> This is not a production-ready project. It may become so, but it's a long way off.
+
 A modern forum/chat hybrid built with **ASP.NET Core** and **PostgreSQL**, designed for:
 - ⚡ Super‑efficient threaded discussions (leveraging Postgres `ltree` for hierarchy).
 - 💬 - hybrid social network / chat / forum experience. Allowing the interactivity of social networks with the depth of forums.It adapts to how the user wants to engage.
