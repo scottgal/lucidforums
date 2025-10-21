@@ -75,6 +75,7 @@ public class TextAiService : ITextAiService
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
             var result = await provider.GenerateAsync(charter, userInput, activeModel, cur.Temperature, cur.MaxTokens, ct);
+            result = Sanitize(result);
             activity?.SetTag(tcfg.Tags.OutputLength, result?.Length ?? 0);
             return result;
         }
@@ -109,6 +110,7 @@ public class TextAiService : ITextAiService
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
             var result = await provider.TranslateAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
+            result = Sanitize(result);
             activity?.SetTag(tcfg.Tags.OutputLength, result?.Length ?? 0);
             return result;
         }
@@ -153,6 +155,7 @@ public class TextAiService : ITextAiService
             activity?.SetTag(tags.ExceptionMessage, ex.Message);
             // Fallback: non-streaming translate then chunk by words
             var full = await provider.TranslateAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
+            full = Sanitize(full);
             var words = full.Split(' ');
             foreach (var w in words)
             {
@@ -169,5 +172,56 @@ public class TextAiService : ITextAiService
     {
         var provider = ResolveProvider(_aiSettings.GenerationProvider);
         return provider.ListModelsAsync(ct);
+    }
+
+    private static string Sanitize(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
+        var s = text;
+        // Remove common reasoning blocks emitted by some models
+        s = RemoveTagBlock(s, "think");
+        s = RemoveTagBlock(s, "reasoning");
+        s = RemoveTagBlock(s, "scratchpad");
+        // Also strip XML comments if they wrap hidden thoughts
+        s = RemoveXmlComments(s);
+        return s.Trim();
+    }
+
+    private static string RemoveTagBlock(string input, string tag)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        string startTag = "<" + tag;
+        string endTag = "</" + tag + ">";
+        int searchFrom = 0;
+        while (true)
+        {
+            int start = input.IndexOf(startTag, searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (start < 0) break;
+            int gt = input.IndexOf('>', start);
+            if (gt < 0) { input = input[..start]; break; }
+            int end = input.IndexOf(endTag, gt + 1, StringComparison.OrdinalIgnoreCase);
+            int removeEnd = end >= 0 ? end + endTag.Length : input.Length;
+            input = input.Remove(start, removeEnd - start);
+            searchFrom = start; // continue searching in case multiple blocks
+        }
+        return input;
+    }
+
+    private static string RemoveXmlComments(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        const string start = "<!--";
+        const string end = "-->";
+        int searchFrom = 0;
+        while (true)
+        {
+            int a = input.IndexOf(start, searchFrom, StringComparison.Ordinal);
+            if (a < 0) break;
+            int b = input.IndexOf(end, a + start.Length, StringComparison.Ordinal);
+            int removeEnd = b >= 0 ? b + end.Length : input.Length;
+            input = input.Remove(a, removeEnd - a);
+            searchFrom = a;
+        }
+        return input;
     }
 }

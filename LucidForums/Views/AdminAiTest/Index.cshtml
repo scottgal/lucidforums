@@ -158,6 +158,25 @@
             <form method="post" asp-action="Embed">
                 @Html.AntiForgeryToken()
                 <div class="form-control mt-3">
+                    <label class="label">Provider</label>
+                    <select name="ProviderName" id="providerSelect3" class="select-md">
+                        @foreach (var p in Model.Providers)
+                        {
+                            <option value="@p" selected="@(string.Equals(Model.SelectedProvider, p, StringComparison.OrdinalIgnoreCase))">@p</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
+                    <label class="label">Model</label>
+                    <select name="ModelName" id="modelSelect3" class="select-md">
+                        <option value="">(Default)</option>
+                        @foreach (var m in Model.Models)
+                        {
+                            <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-control mt-3">
                     <label class="label">Text to Embed</label>
                     <textarea name="Text" class="textarea-md" placeholder="Type text to embed...">@Model.EmbedText</textarea>
                 </div>

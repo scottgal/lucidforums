@@ -1,5 +1,14 @@
 ﻿@model LucidForums.Models.ViewModels.ThreadSummaryVm
-<li class="p-3 border rounded" id="thread-@Model.Id">
-    <a class="link link-primary" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@Model.Title</a>
-    <div class="text-xs text-gray-500">@Model.CreatedAtUtc.ToString("g")</div>
+<li class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow" id="thread-@Model.Id">
+    <div class="card-body p-4">
+        <a class="card-title text-base-content hover:link" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@Model.Title</a>
+        <div class="mt-1 flex items-center gap-3 text-xs opacity-70">
+            <span title="Created">@Model.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+            <span>•</span>
+            <span title="Author">@(string.IsNullOrWhiteSpace(Model.AuthorId) ? "anon" : Model.AuthorId)</span>
+        </div>
+        <div class="card-actions mt-3">
+            <a class="btn btn-sm btn-ghost" href="@Url.Action("Show", "Threads", new { id = Model.Id })">Open</a>
+        </div>
+    </div>
 </li>

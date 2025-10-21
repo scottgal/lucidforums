@@ -146,4 +146,23 @@ public class TextAiServiceTests
         var hasError = act.TagObjects.Any(t => t.Key == topts.CurrentValue.Tags.Error);
         hasError.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task GenerateAsync_Strips_Think_Blocks()
+    {
+        var (svc, _, _, _, providers) = Create("ollama", "ollama");
+        providers[0].GenerateResult = "<think>Internal chain of thought that should not leak.</think>\n**Final answer**: Hello!";
+        var charter = new Charter { Name = "Test" };
+        var output = await svc.GenerateAsync(charter, "hi");
+        output.Should().Be("**Final answer**: Hello!");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_Leaves_Normal_Text_Unchanged()
+    {
+        var (svc, _, _, _, providers) = Create("ollama", "ollama");
+        providers[0].GenerateResult = "Just normal output.";
+        var output = await svc.GenerateAsync(new Charter(), "x");
+        output.Should().Be("Just normal output.");
+    }
 }

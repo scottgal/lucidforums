@@ -140,7 +140,7 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
 
     public record TranslateRequest(string? Text, string? TargetLanguage, string? ModelName, string? ProviderName);
 
-    public record EmbedRequest(string? Text);
+    public record EmbedRequest(string? Text, string? ProviderName, string? ModelName);
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -259,12 +259,28 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
     [Route("Embed")]
     public async Task<IActionResult> Embed([FromForm] EmbedRequest req, CancellationToken ct)
     {
+        // Resolve provider list and models similarly to other actions for consistent UI
+        var providers = chatProviders.Select(p => p.Name).ToList();
+        var selectedProvider = string.IsNullOrWhiteSpace(req.ProviderName) ? (aiSettings.EmbeddingProvider ?? providers.FirstOrDefault()) : req.ProviderName;
+        var prov = !string.IsNullOrWhiteSpace(selectedProvider)
+            ? chatProviders.FirstOrDefault(p => string.Equals(p.Name, selectedProvider, StringComparison.OrdinalIgnoreCase))
+            : null;
+        var models = new List<string>();
+        if (prov != null)
+        {
+            models = (await prov.ListModelsAsync(ct)).ToList();
+        }
+
         var vm = new IndexVm
         {
             CharterOptions = await charters.ListAsync(ct),
+            Providers = providers,
+            SelectedProvider = selectedProvider,
+            Models = models,
             EmbedText = req.Text,
             CurrentEmbeddingProvider = aiSettings.EmbeddingProvider,
-            CurrentEmbeddingModel = aiSettings.EmbeddingModel
+            CurrentEmbeddingModel = aiSettings.EmbeddingModel,
+            ModelName = string.IsNullOrWhiteSpace(req.ModelName) ? aiSettings.EmbeddingModel : req.ModelName
         };
         if (string.IsNullOrWhiteSpace(req.Text))
         {
@@ -274,12 +290,26 @@ public class AdminAiTestController(ITextAiService ai, ICharterService charters, 
         }
         try
         {
-            var vec = await embeddings.EmbedAsync(req.Text!, ct);
-            vm.EmbedDimensions = vec?.Length;
-            if (vec != null && vec.Length > 0)
+            // Temporarily override embedding settings for this request if provided
+            var prevProvider = aiSettings.EmbeddingProvider;
+            var prevModel = aiSettings.EmbeddingModel;
+            if (!string.IsNullOrWhiteSpace(selectedProvider)) aiSettings.EmbeddingProvider = selectedProvider;
+            if (!string.IsNullOrWhiteSpace(req.ModelName)) aiSettings.EmbeddingModel = req.ModelName;
+            try
             {
-                var take = Math.Min(12, vec.Length);
-                vm.EmbedPreview = string.Join(", ", vec.Take(take).Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + (vec.Length > take ? ", ..." : "");
+                var vec = await embeddings.EmbedAsync(req.Text!, ct);
+                vm.EmbedDimensions = vec?.Length;
+                if (vec != null && vec.Length > 0)
+                {
+                    var take = Math.Min(12, vec.Length);
+                    vm.EmbedPreview = string.Join(", ", vec.Take(take).Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + (vec.Length > take ? ", ..." : "");
+                }
+            }
+            finally
+            {
+                // restore previous settings
+                aiSettings.EmbeddingProvider = prevProvider;
+                aiSettings.EmbeddingModel = prevModel;
             }
         }
         catch (Exception ex)

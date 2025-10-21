@@ -2,17 +2,39 @@
 @{
     ViewData["Title"] = Model.Name;
 }
-<div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-bold">@Model.Name</h1>
-    <button class="btn btn-primary"
-            hx-get="@Url.RouteUrl(new { controller = "Forum", action = "CreateThread", forumId = Model.Id })"
-            hx-target="#create-thread"
-            hx-swap="innerHTML">
-        New Thread
-    </button>
+
+<div class="prose-header">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold leading-tight">@Model.Name</h1>
+            @if (!string.IsNullOrWhiteSpace(Model.Description))
+            {
+                <p class="text-base-content/70 mt-1">@Model.Description</p>
+            }
+            <div class="mt-3 flex flex-wrap gap-2 text-sm">
+                <span class="badge badge-outline">Threads: @Model.Threads?.Count()</span>
+                <span class="badge badge-ghost">Slug: @Model.Slug</span>
+            </div>
+        </div>
+        <div class="shrink-0">
+            <button class="btn btn-primary"
+                    hx-get="@Url.RouteUrl(new { controller = "Forum", action = "CreateThread", forumId = Model.Id })"
+                    hx-target="#create-thread"
+                    hx-swap="innerHTML">
+                + New Thread
+            </button>
+        </div>
+    </div>
 </div>
-<p class="mb-6 text-gray-600">@Model.Description</p>
-<div id="create-thread"></div>
-<div id="thread-list">
-    @await Html.PartialAsync("_ThreadList", Model.Threads)
+
+<div id="create-thread" class="mt-4"></div>
+
+<div class="mt-6">
+    <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xl font-semibold">Latest Threads</h2>
+        <a class="link link-primary" href="/">Back to Home</a>
+    </div>
+    <div id="thread-list">
+        @await Html.PartialAsync("_ThreadList", Model.Threads)
+    </div>
 </div>

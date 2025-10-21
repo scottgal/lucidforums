@@ -11,7 +11,7 @@ public interface IThreadService
     Task<List<ForumThread>> ListLatestAsync(int skip = 0, int take = 10, CancellationToken ct = default);
 }
 
-public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring) : IThreadService
+public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Search.IEmbeddingService embeddingService) : IThreadService
 {
     public Task<ForumThread?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -83,6 +83,13 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
             }
         }
         catch { }
+
+        // Fire-and-forget indexing of the root message embedding (important for seeded threads)
+        _ = Task.Run(async () =>
+        {
+            try { await embeddingService.IndexMessageAsync(thread.RootMessageId!.Value, CancellationToken.None); }
+            catch { /* swallow */ }
+        });
 
         return thread;
     }
