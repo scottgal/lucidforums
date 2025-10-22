@@ -167,7 +167,28 @@ public static class ServiceCollectionExtensions
                 .AddOtlpExporter(otlp =>
                 {
                     var endpoint = configuration["Otlp:Endpoint"];
-                    if (!string.IsNullOrWhiteSpace(endpoint)) otlp.Endpoint = new Uri(endpoint);
+                    var protocol = configuration["Otlp:Protocol"]; // "grpc" or "http/protobuf"
+                    if (!string.IsNullOrWhiteSpace(endpoint))
+                    {
+                        var uri = new Uri(endpoint);
+                        otlp.Endpoint = uri;
+                        // Auto-select protocol if not explicitly set: use HTTP/Protobuf for http/https, else gRPC
+                        if (string.IsNullOrWhiteSpace(protocol))
+                        {
+                            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+                                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+                            {
+                                otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                            }
+                        }
+                    }
+                    // Explicit protocol override takes precedence
+                    if (!string.IsNullOrWhiteSpace(protocol))
+                    {
+                        otlp.Protocol = protocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                            ? OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf
+                            : OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    }
                 }))
             .WithMetrics(mp => mp
                 .SetResourceBuilder(resourceBuilder)
@@ -179,7 +200,26 @@ public static class ServiceCollectionExtensions
                 .AddOtlpExporter(otlp =>
                 {
                     var endpoint = configuration["Otlp:Endpoint"];
-                    if (!string.IsNullOrWhiteSpace(endpoint)) otlp.Endpoint = new Uri(endpoint);
+                    var protocol = configuration["Otlp:Protocol"]; // "grpc" or "http/protobuf"
+                    if (!string.IsNullOrWhiteSpace(endpoint))
+                    {
+                        var uri = new Uri(endpoint);
+                        otlp.Endpoint = uri;
+                        if (string.IsNullOrWhiteSpace(protocol))
+                        {
+                            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+                                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+                            {
+                                otlp.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                            }
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(protocol))
+                    {
+                        otlp.Protocol = protocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                            ? OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf
+                            : OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    }
                 }));
 
         return services;
