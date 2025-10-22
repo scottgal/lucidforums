@@ -1,26 +1,27 @@
 ﻿@model LucidForums.Controllers.AdminAiTestController.IndexVm
+@inject LucidForums.Helpers.TranslationHelper T
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 <div class="prose-header">
-    <h1>Admin AI Test</h1>
-    <p class="text-base-content/70">Use this page to test AI interactions with charters and forum thread context.</p>
+    <h1 auto-translate="true" translation-category="admin.ai-test">Admin AI Test</h1>
+    <p class="text-base-content/70" auto-translate="true" translation-category="admin.ai-test">Use this page to test AI interactions with charters and forum thread context.</p>
     <p class="link-row">
-        <a class="link link-primary" href="/Admin/AiSettings">Go to AI Settings</a>
-        <a class="btn btn-sm btn-accent" href="/Setup" title="Use AI to generate realistic sample content">Populate the site</a>
+        <a class="link link-primary" href="/Admin/AiSettings" auto-translate="true" translation-category="admin.ai-test">Go to AI Settings</a>
+        <a class="btn btn-sm btn-accent" href="/Setup" title='@(await T.T("admin.ai-test.populate-title", "Use AI to generate realistic sample content"))' auto-translate="true" translation-category="admin.ai-test">Populate the site</a>
     </p>
 </div>
 
 <div class="grid-2col-xl">
     <div class="card bg-base-100 shadow">
         <div class="card-body">
-            <h2 class="card-title">Run Prompt Against Charter</h2>
+            <h2 class="card-title" auto-translate="true" translation-category="admin.ai-test">Run Prompt Against Charter</h2>
             <form method="post" asp-action="Run">
                 @Html.AntiForgeryToken()
                 <div class="form-control">
-                    <label class="label">Charter</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Charter</label>
                     <select name="CharterId" class="select-md">
-                        <option value="">(Default: General Assistant)</option>
+                        <option value="" auto-translate="true" translation-category="admin.ai-test">(Default: General Assistant)</option>
                         @foreach (var c in Model.CharterOptions)
                         {
                             <option value="@c.Id" selected="@(Model.SelectedCharterId == c.Id)">@c.Name</option>
@@ -28,7 +29,7 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Provider</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Provider</label>
                     <select name="ProviderName" id="providerSelect" class="select-md">
                         @foreach (var p in Model.Providers)
                         {
@@ -37,9 +38,9 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Model</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Model</label>
                     <select name="ModelName" id="modelSelect" class="select-md">
-                        <option value="">(Default)</option>
+                        <option value="" auto-translate="true" translation-category="admin.ai-test">(Default)</option>
                         @foreach (var m in Model.Models)
                         {
                             <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
@@ -47,17 +48,17 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Prompt</label>
-                    <textarea name="Prompt" class="textarea-lg" placeholder="Type your prompt here...">@Model.Prompt</textarea>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Prompt</label>
+                    <textarea name="Prompt" class="textarea-lg" placeholder='@(await T.T("admin.ai-test.prompt-placeholder", "Type your prompt here..."))'>@Model.Prompt</textarea>
                 </div>
                 <div class="action-row">
-                    <button class="btn btn-primary" type="submit">Run</button>
+                    <button class="btn btn-primary" type="submit" auto-translate="true" translation-category="admin.ai-test">Run</button>
                 </div>
             </form>
             @if (!string.IsNullOrWhiteSpace(Model.Output))
             {
                 <div class="mt-4">
-                    <div class="label">Output</div>
+                    <div class="label" auto-translate="true" translation-category="admin.ai-test">Output</div>
                     <pre class="code-pre">@Model.Output</pre>
                 </div>
             }
@@ -66,11 +67,11 @@
 
     <div class="card bg-base-100 shadow">
         <div class="card-body">
-            <h2 class="card-title">Translate Text</h2>
+            <h2 class="card-title" auto-translate="true" translation-category="admin.ai-test">Translate Text</h2>
             <form method="post" asp-action="Translate">
                 @Html.AntiForgeryToken()
                 <div class="form-control">
-                    <label class="label">Provider</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Provider</label>
                     <select name="ProviderName" id="providerSelect2" class="select-md">
                         @foreach (var p in Model.Providers)
                         {
@@ -79,9 +80,9 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Model</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Model</label>
                     <select name="ModelName" id="modelSelect2" class="select-md">
-                        <option value="">(Default)</option>
+                        <option value="" auto-translate="true" translation-category="admin.ai-test">(Default)</option>
                         @foreach (var m in Model.Models)
                         {
                             <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
@@ -89,21 +90,21 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Target Language</label>
-                    <input name="TargetLanguage" value="@Model.TranslateTarget" class="input-md" placeholder="e.g. Spanish, German, French" />
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Target Language</label>
+                    <input name="TargetLanguage" value="@Model.TranslateTarget" class="input-md" placeholder='@(await T.T("admin.ai-test.target-language-placeholder", "e.g. Spanish, German, French"))' />
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Text</label>
-                    <textarea name="Text" class="textarea-md" placeholder="Type or paste text to translate...">@Model.TranslateText</textarea>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Text</label>
+                    <textarea name="Text" class="textarea-md" placeholder='@(await T.T("admin.ai-test.translate-text-placeholder", "Type or paste text to translate..."))'>@Model.TranslateText</textarea>
                 </div>
                 <div class="action-row">
-                    <button class="btn" type="submit">Translate</button>
+                    <button class="btn" type="submit" auto-translate="true" translation-category="admin.ai-test">Translate</button>
                 </div>
             </form>
             @if (!string.IsNullOrWhiteSpace(Model.TranslateOutput))
             {
                 <div class="mt-4">
-                    <div class="label">Translated Output</div>
+                    <div class="label" auto-translate="true" translation-category="admin.ai-test">Translated Output</div>
                     <pre class="code-pre">@Model.TranslateOutput</pre>
                 </div>
             }
@@ -112,21 +113,21 @@
 
     <div class="card bg-base-100 shadow">
         <div class="card-body">
-            <h2 class="card-title">Suggest Reply From Thread Context</h2>
+            <h2 class="card-title" auto-translate="true" translation-category="admin.ai-test">Suggest Reply From Thread Context</h2>
             <form method="post" asp-action="SuggestReply">
                 @Html.AntiForgeryToken()
                 <div class="form-control">
-                    <label class="label">Thread Id</label>
-                    <input name="ThreadId" value="@Model.ThreadId" class="input-md" placeholder="Paste a Thread GUID" />
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Thread Id</label>
+                    <input name="ThreadId" value="@Model.ThreadId" class="input-md" placeholder='@(await T.T("admin.ai-test.thread-guid-placeholder", "Paste a Thread GUID"))' />
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Context Messages</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Context Messages</label>
                     <input type="number" name="ContextMessageLimit" value="@Model.ContextMessageLimit" min="1" max="25" class="input input-bordered w-40" />
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Charter (optional)</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Charter (optional)</label>
                     <select name="CharterId" class="select-md">
-                        <option value="">(Default: Forum Reply Assistant)</option>
+                        <option value="" auto-translate="true" translation-category="admin.ai-test">(Default: Forum Reply Assistant)</option>
                         @foreach (var c in Model.CharterOptions)
                         {
                             <option value="@c.Id" selected="@(Model.SelectedCharterId == c.Id)">@c.Name</option>
@@ -134,17 +135,17 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Additional Instruction (optional)</label>
-                    <textarea name="Prompt" class="textarea-md" placeholder="Optional guidance to the assistant...">@Model.Prompt</textarea>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Additional Instruction (optional)</label>
+                    <textarea name="Prompt" class="textarea-md" placeholder='@(await T.T("admin.ai-test.additional-instruction-placeholder", "Optional guidance to the assistant..."))'>@Model.Prompt</textarea>
                 </div>
                 <div class="action-row">
-                    <button class="btn" type="submit">Suggest Reply</button>
+                    <button class="btn" type="submit" auto-translate="true" translation-category="admin.ai-test">Suggest Reply</button>
                 </div>
             </form>
             @if (!string.IsNullOrWhiteSpace(Model.ReplySuggestion))
             {
                 <div class="mt-4">
-                    <div class="label">Suggested Reply</div>
+                    <div class="label" auto-translate="true" translation-category="admin.ai-test">Suggested Reply</div>
                     <pre class="code-pre">@Model.ReplySuggestion</pre>
                 </div>
             }
@@ -153,12 +154,12 @@
 
     <div class="card bg-base-100 shadow">
         <div class="card-body">
-            <h2 class="card-title">Test Embeddings</h2>
-            <div class="text-sm opacity-70">Uses current embedding settings. Provider: <code>@Model.CurrentEmbeddingProvider</code>, Model: <code>@Model.CurrentEmbeddingModel</code></div>
+            <h2 class="card-title" auto-translate="true" translation-category="admin.ai-test">Test Embeddings</h2>
+            <div class="text-sm opacity-70"><span auto-translate="true" translation-category="admin.ai-test">Uses current embedding settings.</span> <span auto-translate="true" translation-category="admin.ai-test">Provider:</span> <code>@Model.CurrentEmbeddingProvider</code>, <span auto-translate="true" translation-category="admin.ai-test">Model:</span> <code>@Model.CurrentEmbeddingModel</code></div>
             <form method="post" asp-action="Embed">
                 @Html.AntiForgeryToken()
                 <div class="form-control mt-3">
-                    <label class="label">Provider</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Provider</label>
                     <select name="ProviderName" id="providerSelect3" class="select-md">
                         @foreach (var p in Model.Providers)
                         {
@@ -167,9 +168,9 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Model</label>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Model</label>
                     <select name="ModelName" id="modelSelect3" class="select-md">
-                        <option value="">(Default)</option>
+                        <option value="" auto-translate="true" translation-category="admin.ai-test">(Default)</option>
                         @foreach (var m in Model.Models)
                         {
                             <option value="@m" selected="@(string.Equals(Model.ModelName, m, StringComparison.OrdinalIgnoreCase))">@m</option>
@@ -177,22 +178,22 @@
                     </select>
                 </div>
                 <div class="form-control mt-3">
-                    <label class="label">Text to Embed</label>
-                    <textarea name="Text" class="textarea-md" placeholder="Type text to embed...">@Model.EmbedText</textarea>
+                    <label class="label" auto-translate="true" translation-category="admin.ai-test">Text to Embed</label>
+                    <textarea name="Text" class="textarea-md" placeholder='@(await T.T("admin.ai-test.embed-text-placeholder", "Type text to embed..."))'>@Model.EmbedText</textarea>
                 </div>
                 <div class="action-row">
-                    <button class="btn" type="submit">Embed</button>
-                    <a class="btn btn-ghost" href="/Admin/AiSettings">Adjust Embedding Settings</a>
+                    <button class="btn" type="submit" auto-translate="true" translation-category="admin.ai-test">Embed</button>
+                    <a class="btn btn-ghost" href="/Admin/AiSettings" auto-translate="true" translation-category="admin.ai-test">Adjust Embedding Settings</a>
                 </div>
             </form>
             @if (Model.EmbedDimensions.HasValue)
             {
                 <div class="mt-4">
-                    <div class="label">Result</div>
-                    <div class="text-sm">Dimensions: <span class="font-mono">@Model.EmbedDimensions</span></div>
+                    <div class="label" auto-translate="true" translation-category="admin.ai-test">Result</div>
+                    <div class="text-sm"><span auto-translate="true" translation-category="admin.ai-test">Dimensions:</span> <span class="font-mono">@Model.EmbedDimensions</span></div>
                     @if (!string.IsNullOrWhiteSpace(Model.EmbedPreview))
                     {
-                        <div class="text-sm mt-2">Preview: <code>@Model.EmbedPreview</code></div>
+                        <div class="text-sm mt-2"><span auto-translate="true" translation-category="admin.ai-test">Preview:</span> <code>@Model.EmbedPreview</code></div>
                     }
                 </div>
             }

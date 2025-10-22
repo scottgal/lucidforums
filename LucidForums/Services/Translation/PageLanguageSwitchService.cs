@@ -99,6 +99,11 @@ internal sealed class PageLanguageSwitchService : IPageLanguageSwitchService
 
         var bgCt = CancellationToken.None; // prevent disposal-related cancellations
 
+        // Progress tracking context
+        var jobId = Guid.NewGuid().ToString("N");
+        var total = missing.Count;
+        var completed = 0;
+
         try
         {
             // Build batch and ask for JSON array response only
@@ -117,11 +122,31 @@ Respond with ONLY a JSON array of objects with properties: key, translated. Do n
 Input items (JSON array of {{ key, text }}):
 {jsonPayload}";
 
+            // Broadcast initial progress (0%)
+            await _hubContext.Clients.All.SendAsync("TranslationProgress", new
+            {
+                JobId = jobId,
+                Total = total,
+                Completed = completed,
+                CurrentKey = (string?)null,
+                Percentage = total > 0 ? 0 : 100
+            }, bgCt);
+
             var aiResult = await _ai.GenerateAsync(charter, prompt, ct: bgCt);
             var map = ParseBatchToMap(aiResult);
 
             foreach (var m in missing)
             {
+                // Notify current key being processed
+                await _hubContext.Clients.All.SendAsync("TranslationProgress", new
+                {
+                    JobId = jobId,
+                    Total = total,
+                    Completed = completed,
+                    CurrentKey = m.Key,
+                    Percentage = total > 0 ? (completed / (double)total) * 100.0 : 0
+                }, bgCt);
+
                 if (!map.TryGetValue(m.Key, out var translated) || string.IsNullOrWhiteSpace(translated))
                 {
                     // Fallback per-item translate
@@ -154,11 +179,23 @@ Input items (JSON array of {{ key, text }}):
 
                     await db.SaveChangesAsync(bgCt);
 
+                    // Broadcast the updated string
                     await _hubContext.Clients.All.SendAsync("StringTranslated", new
                     {
                         Key = m.Key,
                         LanguageCode = languageCode,
                         TranslatedText = translated
+                    }, bgCt);
+
+                    // Increment and broadcast progress
+                    completed++;
+                    await _hubContext.Clients.All.SendAsync("TranslationProgress", new
+                    {
+                        JobId = jobId,
+                        Total = total,
+                        Completed = completed,
+                        CurrentKey = m.Key,
+                        Percentage = total > 0 ? (completed / (double)total) * 100.0 : 100
                     }, bgCt);
                 }
                 catch (Exception ex)
@@ -166,6 +203,13 @@ Input items (JSON array of {{ key, text }}):
                     _logger.LogWarning(ex, "Failed to upsert/broadcast translation for {Key} ({Lang})", m.Key, languageCode);
                 }
             }
+
+            // Broadcast completion
+            await _hubContext.Clients.All.SendAsync("TranslationComplete", new
+            {
+                JobId = jobId,
+                TranslatedCount = completed
+            }, bgCt);
         }
         catch (Exception ex)
         {

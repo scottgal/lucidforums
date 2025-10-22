@@ -1,22 +1,23 @@
 ﻿@model LucidForums.Models.ViewModels.ThreadSummaryVm
+@inject LucidForums.Helpers.TranslationHelper T
 <li id="thread-@Model.Id" class="py-3">
     <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
             <a class="text-base-content hover:link font-medium" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@Model.Title</a>
             <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-70">
-                <span title="Created">@Model.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                <span title='@(await T.T("forum.thread.created-title", "Created"))'>@Model.CreatedAtUtc.ToLocalTime().ToString("g")</span>
                 <span>•</span>
-                <span title="Author">@(string.IsNullOrWhiteSpace(Model.AuthorId) ? "anon" : Model.AuthorId)</span>
+                <span title='@(await T.T("forum.thread.author-title", "Author"))'>@(string.IsNullOrWhiteSpace(Model.AuthorId) ? await T.T("forum.thread.anon", "anon") : Model.AuthorId)</span>
                 <span>•</span>
-                <span title="Charter score">Charter: @(Model.CharterScore?.ToString("0") ?? "-")</span>
+                <span title='@(await T.T("forum.thread.charter-score-title", "Charter score"))'><span auto-translate="true" translation-category="forum.thread">Charter:</span> @(Model.CharterScore?.ToString("0") ?? "-")</span>
                 <span>•</span>
-                <span title="Replies">Replies: @Model.ReplyCount</span>
+                <span title='@(await T.T("forum.thread.replies-title", "Replies"))'><span auto-translate="true" translation-category="forum.thread">Replies:</span> @Model.ReplyCount</span>
                 <span>•</span>
-                <span title="Last interaction">Last: @Model.LastInteractionUtc.ToLocalTime().ToString("g")</span>
+                <span title='@(await T.T("forum.thread.last-interaction-title", "Last interaction"))'><span auto-translate="true" translation-category="forum.thread">Last:</span> @Model.LastInteractionUtc.ToLocalTime().ToString("g")</span>
             </div>
         </div>
         <div class="shrink-0">
-            <a class="btn btn-sm btn-ghost" href="@Url.Action("Show", "Threads", new { id = Model.Id })">Open</a>
+            <a class="btn btn-sm btn-ghost" href="@Url.Action("Show", "Threads", new { id = Model.Id })" auto-translate="true" translation-category="forum.thread">Open</a>
         </div>
     </div>
 </li>
