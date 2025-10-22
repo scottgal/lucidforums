@@ -5,12 +5,12 @@
 {
     foreach (var f in Model)
     {
-        <a class="card bg-base-100 hover:shadow-xl transition-shadow border border-base-300" href="@Url.Action("Details", "Forum", new { slug = f.Slug })">
+        <a class="card bg-base-100 hover:shadow-xl transition-shadow border border-base-300" href="@Url.Action("Details", "Forum", new { slug = f.Slug })" data-forum-id="@f.Id">
             <div class="card-body">
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <h3 class="card-title">@f.Name</h3>
-                        <p class="text-base-content/70 mt-1">@f.Description</p>
+                        <h3 class="card-title forum-name">@f.Name</h3>
+                        <p class="text-base-content/70 mt-1 forum-description">@f.Description</p>
                     </div>
                     <div class="badge badge-lg" auto-translate="true" translation-category="home.forums">Forum</div>
                 </div>

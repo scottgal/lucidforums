@@ -28,10 +28,11 @@ function wire(providerId, modelId) {
 
 function initAdminAiTestPage(root) {
   // Detect by presence of one of the known selects
-  const hasAny = root.querySelector('#providerSelect') || root.querySelector('#providerSelect2') || document.getElementById('providerSelect') || document.getElementById('providerSelect2');
+  const hasAny = root.querySelector('#providerSelect') || root.querySelector('#providerSelect2') || root.querySelector('#providerSelect3') || document.getElementById('providerSelect') || document.getElementById('providerSelect2') || document.getElementById('providerSelect3');
   if (!hasAny) return;
   wire('providerSelect', 'modelSelect');
   wire('providerSelect2', 'modelSelect2');
+  wire('providerSelect3', 'modelSelect3');
 }
 
 if (document.readyState === 'loading') {

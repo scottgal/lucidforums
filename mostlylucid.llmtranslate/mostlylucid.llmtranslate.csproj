@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>mostlylucid.llmtranslate</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>LucidForums</Authors>
+    <Description>Auto-translation tag helpers for ASP.NET Core with HTMX integration and AI-powered translations. Automatically translates UI strings and user content with real-time updates via SignalR.</Description>
+    <PackageProjectUrl>https://github.com/lucidforums/LucidForums</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lucidforums/LucidForums</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>asp.net-core;translation;localization;i18n;htmx;signalr;ai;tag-helpers</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+
+    <!-- Disable default content items to avoid duplicates -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateStaticWebAssetsManifest>false</GenerateStaticWebAssetsManifest>
+    <IncludeStaticWebAssets>false</IncludeStaticWebAssets>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Explicitly include source files, exclude Examples folder -->
+    <Compile Include="**\*.cs" Exclude="bin\**;obj\**;Examples\**" />
+    <EmbeddedResource Include="**\*.resx" Exclude="bin\**;obj\**" />
+
+    <!-- Include example files as content only (not compiled) -->
+    <None Include="Examples\**\*" Pack="true" PackagePath="contentFiles\any\net9.0\Examples" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core dependencies -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <!-- Entity Framework Core for PostgreSQL -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+
+    <!-- Entity Framework Core for SQLite -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+
+    <!-- AI capabilities -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="9.10.1" />
+
+    <!-- JSON serialization for file storage -->
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+
+    <!-- SignalR is included in Microsoft.AspNetCore.App -->
+
+    <!-- Utilities -->
+    <PackageReference Include="System.IO.Hashing" Version="9.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include README in package -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+
+    <!-- Include JavaScript files as content that will be copied to consumer's wwwroot -->
+    <Content Include="wwwroot\**\*" Pack="true" PackagePath="contentFiles\any\net9.0\wwwroot" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="wwwroot\**\*" Pack="true" PackagePath="content\wwwroot" />
+  </ItemGroup>
+
+</Project>

@@ -194,7 +194,7 @@ async function initTranslationHub() {
             completeProgressUI();
         });
 
-        // Listen for content translation updates (user-generated content like messages)
+        // Listen for content translation updates (user-generated content like messages, threads, forums)
         connection.on('ContentTranslated', (data) => {
             const { contentType, contentId, fieldName, language, translatedText } = data;
 
@@ -206,10 +206,19 @@ async function initTranslationHub() {
                 return;
             }
 
+            // Helper to add a brief highlight/fade animation
+            function animateSwap(el) {
+                if (!el) return;
+                el.classList.add('lf-translation-updating');
+                el.style.transition = 'opacity 0.2s';
+                el.style.opacity = '0.85';
+                setTimeout(() => { el.style.opacity = '1'; el.classList.remove('lf-translation-updating'); }, 200);
+            }
+
             // For messages, look for message container with data-message-id
             if (contentType === 'Message' && fieldName === 'Content') {
-                const messageElement = document.querySelector(`[data-message-id="${contentId}"]`);
-                if (messageElement) {
+                const messageElements = document.querySelectorAll(`[data-message-id="${contentId}"]`);
+                messageElements.forEach((messageElement) => {
                     const contentElement = messageElement.querySelector('.message-content');
                     if (contentElement) {
                         // Encode HTML and replace newlines with <br/> to match the server rendering
@@ -221,18 +230,34 @@ async function initTranslationHub() {
                             .replace(/'/g, '&#039;')
                             .replace(/\n/g, '<br/>');
                         contentElement.innerHTML = encodedText;
-
-                        // Add visual indicator with fade effect
-                        messageElement.classList.add('lf-translation-updating');
-                        contentElement.style.transition = 'opacity 0.3s';
-                        contentElement.style.opacity = '0.7';
-                        setTimeout(() => {
-                            contentElement.style.opacity = '1';
-                            setTimeout(() => {
-                                messageElement.classList.remove('lf-translation-updating');
-                            }, 300);
-                        }, 100);
+                        animateSwap(contentElement);
                     }
+                });
+                return;
+            }
+
+            // Thread title updates
+            if (contentType === 'Thread' && fieldName === 'Title') {
+                const nodes = document.querySelectorAll(`[data-thread-id="${contentId}"] .thread-title, .thread-title[data-thread-id="${contentId}"]`);
+                nodes.forEach((n) => {
+                    // For anchors or headings, replace text content
+                    n.textContent = translatedText || '';
+                    animateSwap(n);
+                });
+                return;
+            }
+
+            // Forum name/description updates
+            if (contentType === 'Forum') {
+                if (fieldName === 'Name') {
+                    const nameNodes = document.querySelectorAll(`[data-forum-id="${contentId}"] .forum-name, .forum-name[data-forum-id="${contentId}"]`);
+                    nameNodes.forEach((n) => { n.textContent = translatedText || ''; animateSwap(n); });
+                    return;
+                }
+                if (fieldName === 'Description') {
+                    const descNodes = document.querySelectorAll(`[data-forum-id="${contentId}"] .forum-description, .forum-description[data-forum-id="${contentId}"]`);
+                    descNodes.forEach((n) => { n.textContent = translatedText || ''; animateSwap(n); });
+                    return;
                 }
             }
         });
