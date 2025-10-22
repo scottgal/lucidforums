@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
 using LucidForums.Helpers;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -54,18 +52,10 @@ public partial class AutoTranslateTagHelper : TagHelper
         return string.IsNullOrEmpty(slug) ? "text" : slug;
     }
 
-    private static string GenerateContentHash(string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var hash = SHA256.HashData(bytes);
-        // Take first 4 bytes for compact hash
-        return Convert.ToHexString(hash[..4]).ToLowerInvariant();
-    }
-
     private static string GenerateTranslationKey(string content, string? category = null)
     {
         var slug = Slugify(content);
-        var hash = GenerateContentHash(content);
+        var hash = ContentHash.Generate(content, 4);
 
         // Format: [category.]slug-hash
         if (!string.IsNullOrEmpty(category))
@@ -99,15 +89,15 @@ public partial class AutoTranslateTagHelper : TagHelper
         var translatedText = await _translator.T(translationKey, originalText);
 
         // Generate deterministic ID for HTMX OOB targeting
-        var elementId = $"t-{GenerateContentHash(translationKey)}";
+        var elementId = $"t-{ContentHash.Generate(translationKey)}";
 
         // Add attributes for translation system
         output.Attributes.RemoveAll("auto-translate");
         output.Attributes.SetAttribute("id", elementId);
         output.Attributes.SetAttribute("data-translate-key", translationKey);
-        output.Attributes.SetAttribute("data-content-hash", GenerateContentHash(originalText));
+        output.Attributes.SetAttribute("data-content-hash", ContentHash.Generate(originalText));
 
-        // Set translated content
-        output.Content.SetContent(translatedText);
+        // Set translated content; allow HTML in translations
+        output.Content.SetHtmlContent(translatedText);
     }
 }

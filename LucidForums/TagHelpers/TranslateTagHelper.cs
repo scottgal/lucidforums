@@ -1,6 +1,3 @@
-using System.IO.Hashing;
-using System.Security.Cryptography;
-using System.Text;
 using LucidForums.Helpers;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
@@ -29,17 +26,6 @@ public class TranslateTagHelper : TagHelper
         _translator = translator;
     }
 
-    /// <summary>
-    /// Generate a compact hash of the content for HTMX OOB targeting
-    /// </summary>
-    private static string GenerateContentHash(string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var hash = XxHash64.Hash(bytes);
-        // Take first 8 bytes and convert to hex for a compact identifier
-        return Convert.ToHexString(hash[..8]).ToLowerInvariant();
-    }
-
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         // Get the default text from the tag content
@@ -48,9 +34,9 @@ public class TranslateTagHelper : TagHelper
 
         if (string.IsNullOrEmpty(Key))
         {
-            // If no key provided, output the default text as-is
+            // If no key provided, output the default text as-is (allow HTML in content)
             output.TagName = null; // Remove the <t> tag
-            output.Content.SetContent(defaultText);
+            output.Content.SetHtmlContent(defaultText);
             return;
         }
 
@@ -61,17 +47,18 @@ public class TranslateTagHelper : TagHelper
 
         // Generate a unique, compact ID based on the translation key for HTMX targeting
         // Using a hash ensures IDs are valid and collision-resistant
-        var elementId = $"t-{GenerateContentHash(Key)}";
+        var elementId = $"t-{ContentHash.Generate(Key)}";
 
         // Output span with attributes optimized for HTMX OOB swaps
         output.TagName = "span";
         output.Attributes.SetAttribute("id", elementId); // Required for HTMX OOB targeting
         output.Attributes.SetAttribute("data-translate-key", Key);
-        output.Attributes.SetAttribute("data-content-hash", GenerateContentHash(defaultText)); // For change detection
+        output.Attributes.SetAttribute("data-content-hash", ContentHash.Generate(defaultText)); // For change detection
 
         if (!string.IsNullOrEmpty(Category))
             output.Attributes.SetAttribute("data-translate-category", Category);
 
-        output.Content.SetContent(translatedText);
+        // Allow translations to include intentional HTML markup
+        output.Content.SetHtmlContent(translatedText);
     }
 }

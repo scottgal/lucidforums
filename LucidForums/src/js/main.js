@@ -43,6 +43,7 @@ import './editor.js'
 import './pages/admin-ai-settings.js'
 import './pages/admin-ai-test.js'
 import './pages/setup.js'
+import * as signalR from '@microsoft/signalr';
 // ======================
 // 4) INITIAL SETUP
 // ======================
@@ -98,3 +99,36 @@ htmx.onLoad(function(content) {
 // 9) INITIALIZATION
 // ======================
 registerSweetAlertHxIndicator();
+
+// TranslationHub: live per-string updates via SignalR
+async function initTranslationHub() {
+    try {
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/translation')
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on('StringTranslated', (payload) => {
+            const key = payload?.Key || payload?.key;
+            const translatedText = payload?.TranslatedText || payload?.translatedText;
+            if (!key) return;
+            const el = document.querySelector(`[data-translate-key="${CSS.escape(key)}"]`);
+            if (!el) return;
+            el.innerHTML = translatedText ?? '';
+            // Subtle fade to indicate update
+            el.style.transition = 'opacity 0.15s';
+            el.style.opacity = '0.85';
+            setTimeout(() => { el.style.opacity = '1'; }, 75);
+        });
+
+        await connection.start();
+    } catch (e) {
+        console.warn('TranslationHub connection failed', e);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initTranslationHub());
+} else {
+    initTranslationHub();
+}

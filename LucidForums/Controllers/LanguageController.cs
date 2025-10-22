@@ -1,7 +1,14 @@
-using System.Security.Cryptography;
+using System.Diagnostics;
 using System.Text;
+using LucidForums.Helpers;
 using LucidForums.Services.Translation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using LucidForums.Data;
+using Microsoft.AspNetCore.SignalR;
+using LucidForums.Hubs;
+using LucidForums.Services.Ai;
+using LucidForums.Models.Entities;
 
 namespace LucidForums.Controllers;
 
@@ -9,10 +16,12 @@ namespace LucidForums.Controllers;
 public class LanguageController : Controller
 {
     private readonly ITranslationService _translationService;
+    private readonly IPageLanguageSwitchService _pageSwitchService;
 
-    public LanguageController(ITranslationService translationService)
+    public LanguageController(ITranslationService translationService, IPageLanguageSwitchService pageSwitchService)
     {
         _translationService = translationService;
+        _pageSwitchService = pageSwitchService;
     }
 
     [HttpPost("Set")]
@@ -69,28 +78,8 @@ public class LanguageController : Controller
             SameSite = SameSiteMode.Lax
         });
 
-        // Get translations for the requested keys
-        var html = new StringBuilder();
-
-        foreach (var key in keys)
-        {
-            var translatedText = await _translationService.GetAsync(key, languageCode, ct);
-            var elementId = $"t-{GenerateContentHash(key)}";
-
-            // Generate HTMX OOB swap element
-            html.AppendLine($"<span id=\"{elementId}\" hx-swap-oob=\"innerHTML\">{System.Net.WebUtility.HtmlEncode(translatedText)}</span>");
-        }
-
-        // Also update the language indicator
-        html.AppendLine($"<span id=\"current-lang\" hx-swap-oob=\"innerHTML\">{languageCode.ToUpperInvariant()}</span>");
-
-        return Content(html.ToString(), "text/html");
+        var html = await _pageSwitchService.BuildSwitchResponseAsync(languageCode, keys, ct);
+        return Content(html, "text/html");
     }
 
-    private static string GenerateContentHash(string content)
-    {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash[..8]).ToLowerInvariant();
-    }
 }
