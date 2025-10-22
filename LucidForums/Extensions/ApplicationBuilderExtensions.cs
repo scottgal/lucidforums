@@ -4,6 +4,7 @@ using Serilog;
 using Microsoft.AspNetCore.Identity;
 using LucidForums.Models.Entities;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace LucidForums.Extensions;
 
@@ -44,6 +45,7 @@ public static class ApplicationBuilderExtensions
         // SignalR hubs
         app.MapHub<LucidForums.Hubs.ForumHub>(LucidForums.Hubs.ForumHub.HubPath);
         app.MapHub<LucidForums.Hubs.SeedingHub>(LucidForums.Hubs.SeedingHub.HubPath);
+        app.MapHub<LucidForums.Hubs.TranslationHub>(LucidForums.Hubs.TranslationHub.HubPath);
 
         return app;
     }
@@ -52,7 +54,57 @@ public static class ApplicationBuilderExtensions
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Database.MigrateAsync();
+
+        // Ensure the database exists
+        try
+        {
+            // Try to create the database if it doesn't exist
+            var connectionString = db.Database.GetConnectionString();
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                // Parse connection string to get database name
+                var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+                var databaseName = builder.Database;
+
+                // Connect to postgres database to create our database
+                builder.Database = "postgres";
+                var masterConnectionString = builder.ToString();
+
+                using var masterConnection = new Npgsql.NpgsqlConnection(masterConnectionString);
+                await masterConnection.OpenAsync();
+
+                // Check if database exists
+                using var checkCmd = masterConnection.CreateCommand();
+                checkCmd.CommandText = $"SELECT 1 FROM pg_database WHERE datname = '{databaseName}'";
+                var exists = await checkCmd.ExecuteScalarAsync();
+
+                if (exists == null)
+                {
+                    // Create database
+                    using var createCmd = masterConnection.CreateCommand();
+                    createCmd.CommandText = $"CREATE DATABASE \"{databaseName}\"";
+                    await createCmd.ExecuteNonQueryAsync();
+                    Log.Logger.Information("Created database: {DatabaseName}", databaseName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail - maybe database already exists or we don't have permissions
+            Log.Logger.Warning(ex, "Could not ensure database exists - it may already exist or permissions may be insufficient");
+        }
+
+        // Now run migrations on the actual database
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            // If migrations fail, try EnsureCreated as fallback
+            Log.Logger.Warning(ex, "Migration failed, attempting EnsureCreated");
+            await db.Database.EnsureCreatedAsync();
+        }
         try
         {
             // Enable required extensions (handled inside SQL to avoid noisy errors when lacking privileges)

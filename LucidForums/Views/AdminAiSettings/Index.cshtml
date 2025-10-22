@@ -7,12 +7,34 @@
     <h1>AI Settings</h1>
     <p class="text-base-content/70">Choose which AI provider and model to use for generation, translation, and embeddings.</p>
     <div class="mt-2 flex gap-2 flex-wrap">
-        <a class="btn btn-sm btn-accent" href="/Setup" title="Use AI to generate realistic sample content">Populate the site</a>
+        <a href="@Url.Action("Index", "AdminTranslation")" class="btn btn-sm btn-primary" title="Manage site translations">Translations</a>
+        <button type="button" class="btn btn-sm btn-accent"
+                hx-get="/Setup"
+                hx-target="#setup-modal-content"
+                hx-swap="innerHTML"
+                onclick="document.getElementById('setup-modal').showModal()"
+                title="Use AI to generate realistic sample content">Populate the site</button>
         <form method="post" action="/Admin/ClearContent" onsubmit="return confirm('This will delete all forums, threads, messages, memberships, and embeddings. Settings and users are preserved. Are you sure?');">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-sm btn-error" title="Delete all content (forums, threads, messages, embeddings)">Clear data</button>
         </form>
     </div>
+
+    <dialog id="setup-modal" class="modal">
+        <div class="modal-box max-w-4xl">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <div id="setup-modal-content">
+                <div class="flex justify-center items-center h-32">
+                    <span class="loading loading-spinner loading-lg"></span>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 </div>
 @if (TempData["Message"] is string tmsg && !string.IsNullOrWhiteSpace(tmsg))
 {

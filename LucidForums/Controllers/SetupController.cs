@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using LucidForums.Data;
 using Microsoft.EntityFrameworkCore;
+using LucidForums.Extensions;
 
 namespace LucidForums.Controllers;
 
@@ -10,6 +11,8 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
     [HttpGet]
     public IActionResult Index()
     {
+        if (Request.IsHtmxRequest())
+            return PartialView("_SetupForm");
         return View();
     }
 
@@ -34,7 +37,7 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
         await queue.EnqueueAsync(job, ct);
 
         // If htmx, return polling fragment; else return JSON
-        if (Request.Headers.ContainsKey("HX-Request"))
+        if (Request.IsHtmxRequest())
         {
             Response.Headers["HX-Trigger"] = "setup-seeding-started";
             var html = $@"<div id=""progressPoller"" hx-get=""/Setup/Progress?jobId={jobId}"" hx-trigger=""load, every 1s"" hx-target=""#progress"" hx-swap=""innerHTML"">Seeding job started…</div>";

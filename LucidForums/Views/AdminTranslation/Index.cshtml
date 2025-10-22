@@ -1,0 +1,184 @@
+@model LucidForums.Controllers.AdminTranslationController.IndexVm
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Admin • Translation Management";
+}
+
+<div class="prose-header">
+    <h1>Translation Management</h1>
+    <p class="text-base-content/70">Manage translations for UI strings and user-generated content using AI.</p>
+</div>
+
+@if (TempData["Message"] is string tmsg && !string.IsNullOrWhiteSpace(tmsg))
+{
+    <div class="alert alert-success my-3">@tmsg</div>
+}
+@if (TempData["Error"] is string terr && !string.IsNullOrWhiteSpace(terr))
+{
+    <div class="alert alert-error my-3">@terr</div>
+}
+
+<div class="grid gap-6">
+    <!-- Statistics Overview -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Translation Statistics</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Language</th>
+                            <th>Total Strings</th>
+                            <th>Translated</th>
+                            <th>Pending</th>
+                            <th>Completion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var stat in Model.Stats)
+                        {
+                            <tr>
+                                <td><span class="badge badge-primary">@stat.LanguageCode.ToUpper()</span></td>
+                                <td>@stat.TotalStrings</td>
+                                <td>@stat.TranslatedStrings</td>
+                                <td>@stat.PendingStrings</td>
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <progress class="progress progress-success w-32" value="@stat.CompletionPercentage" max="100"></progress>
+                                        <span class="text-sm">@stat.CompletionPercentage.ToString("F1")%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translate UI Strings -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Translate UI Strings</h2>
+            <p class="text-sm text-base-content/70">Use AI to translate all UI strings to a target language.</p>
+
+            <form hx-post="/Admin/Translation/TranslateStrings" hx-target="#string-translation-result" hx-swap="innerHTML" class="flex gap-2 items-end">
+                @Html.AntiForgeryToken()
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Target Language</span>
+                    </label>
+                    <select name="targetLanguage" class="select select-bordered" required>
+                        <option value="">Select language...</option>
+                        <option value="es">Spanish (es)</option>
+                        <option value="fr">French (fr)</option>
+                        <option value="de">German (de)</option>
+                        <option value="it">Italian (it)</option>
+                        <option value="pt">Portuguese (pt)</option>
+                        <option value="ja">Japanese (ja)</option>
+                        <option value="zh">Chinese (zh)</option>
+                        <option value="ko">Korean (ko)</option>
+                        <option value="ru">Russian (ru)</option>
+                        <option value="ar">Arabic (ar)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Translate All Strings</button>
+            </form>
+
+            <div id="string-translation-result" class="mt-4"></div>
+        </div>
+    </div>
+
+    <!-- Translate Content -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Translate User Content</h2>
+            <p class="text-sm text-base-content/70">Translate forums, threads, and messages using AI.</p>
+
+            <form hx-post="/Admin/Translation/TranslateContent" hx-target="#content-translation-result" hx-swap="innerHTML" class="flex gap-2 items-end flex-wrap">
+                @Html.AntiForgeryToken()
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Content Type</span>
+                    </label>
+                    <select name="contentType" class="select select-bordered" required>
+                        <option value="Forum">Forums</option>
+                        <option value="Thread">Threads</option>
+                        <option value="Message">Messages</option>
+                    </select>
+                </div>
+                <div class="form-control flex-1">
+                    <label class="label">
+                        <span class="label-text">Target Language</span>
+                    </label>
+                    <select name="targetLanguage" class="select select-bordered" required>
+                        <option value="">Select language...</option>
+                        <option value="es">Spanish (es)</option>
+                        <option value="fr">French (fr)</option>
+                        <option value="de">German (de)</option>
+                        <option value="it">Italian (it)</option>
+                        <option value="pt">Portuguese (pt)</option>
+                        <option value="ja">Japanese (ja)</option>
+                        <option value="zh">Chinese (zh)</option>
+                        <option value="ko">Korean (ko)</option>
+                        <option value="ru">Russian (ru)</option>
+                        <option value="ar">Arabic (ar)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-accent">Translate Content</button>
+            </form>
+
+            <div id="content-translation-result" class="mt-4"></div>
+        </div>
+    </div>
+
+    <!-- View Strings -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Manage Translation Strings</h2>
+            <p class="text-sm text-base-content/70">View and edit individual translation strings.</p>
+            <div class="mt-4">
+                <a href="@Url.Action("Strings")" class="btn btn-outline">View All Strings</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+<script>
+    // Connect to TranslationHub for real-time progress updates
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("@LucidForums.Hubs.TranslationHub.HubPath")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("TranslationProgress", (data) => {
+        console.log("Translation progress:", data);
+        const jobElement = document.getElementById(`job-${data.jobId}`);
+        if (jobElement) {
+            const progress = jobElement.querySelector('progress');
+            const text = jobElement.querySelector('.text-sm');
+            if (progress) progress.value = data.percentage;
+            if (text) text.textContent = `Translating: ${data.completed}/${data.total} (${data.percentage.toFixed(1)}%)`;
+            if (data.currentKey) {
+                text.textContent += ` - ${data.currentKey}`;
+            }
+        }
+    });
+
+    connection.on("TranslationComplete", (data) => {
+        console.log("Translation complete:", data);
+        const jobElement = document.getElementById(`job-${data.jobId}`);
+        if (jobElement) {
+            jobElement.innerHTML = `<div class="alert alert-success">
+                <span>Translation complete! Translated ${data.translatedCount} items.</span>
+            </div>`;
+        }
+        // Reload page to refresh stats
+        setTimeout(() => window.location.reload(), 2000);
+    });
+
+    connection.start().catch(err => console.error("SignalR connection error:", err));
+</script>
+}

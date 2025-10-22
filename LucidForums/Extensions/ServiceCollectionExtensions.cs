@@ -134,6 +134,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICharterScoringService, CharterScoringService>();
         // Search service
         services.AddScoped<ISearchService, SearchService>();
+        // Translation services
+        services.AddScoped<Services.Translation.RequestTranslationCache>(); // Request-scoped cache to avoid concurrent DbContext access
+        services.AddScoped<Services.Translation.ITranslationService, Services.Translation.TranslationService>();
+        services.AddScoped<Services.Translation.IContentTranslationService, Services.Translation.ContentTranslationService>();
+        services.AddScoped<TranslationHelper>();
         return services;
     }
 

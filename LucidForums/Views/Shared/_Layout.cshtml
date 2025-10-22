@@ -14,7 +14,12 @@
     <div class="navbar bg-base-100 shadow-sm">
         <div class="container mx-auto">
             <div class="flex-1">
-                <a class="btn btn-ghost normal-case text-xl" asp-area="" asp-controller="Home" asp-action="Index">🌙 LucidForums</a>
+                <a class="btn btn-ghost normal-case text-xl" asp-area="" asp-controller="Home" asp-action="Index">
+                    <span class="flex items-center gap-2">
+                        <span>LucidForums</span>
+                        <span class="text-xs opacity-70">by MostlyLucid</span>
+                    </span>
+                </a>
             </div>
             <div class="flex-none gap-2">
                 <ul class="menu menu-horizontal px-1">
@@ -23,6 +28,24 @@
                     <li><a asp-area="" asp-controller="Settings" asp-action="Index">Settings</a></li>
                     <li><a asp-area="" asp-controller="AdminAiTest" asp-action="Index">AI Test</a></li>
                 </ul>
+                <!-- Language Selector -->
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span id="current-lang" class="text-xs">EN</span>
+                    </div>
+                    <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
+                        <li><a onclick="setLanguage('en')">English</a></li>
+                        <li><a onclick="setLanguage('es')">Español</a></li>
+                        <li><a onclick="setLanguage('fr')">Français</a></li>
+                        <li><a onclick="setLanguage('de')">Deutsch</a></li>
+                        <li><a onclick="setLanguage('ja')">日本語</a></li>
+                        <li><a onclick="setLanguage('zh')">中文</a></li>
+                    </ul>
+                </div>
+
                 <label class="swap swap-rotate">
                     <input type="checkbox" class="theme-controller" value="dark" />
                     <svg class="swap-off h-6 w-6 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17l-1.41 1.41-1.41-1.41L4.22 15.6 5.64 17zm0-10L4.22 5.4 2.81 6.81 4.22 8.22 5.64 7zM12 4.5A7.5 7.5 0 1 1 4.5 12 7.51 7.51 0 0 1 12 4.5m0-2A9.5 9.5 0 1 0 21.5 12 9.5 9.5 0 0 0 12 2.5z"/></svg>
@@ -69,6 +92,7 @@
 </footer>
 <script type="module" src="~/js/dist/runtime.js" asp-append-version="true"></script>
 <script type="module" src="~/js/dist/main.js" asp-append-version="true"></script>
+<script src="~/js/translation.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

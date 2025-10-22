@@ -1,0 +1,67 @@
+<h2 class="text-2xl font-bold mb-4" auto-translate="true" translation-category="setup">Setup Sample Forum</h2>
+<p class="mb-4" auto-translate="true" translation-category="setup">Use this tool to generate a sample forum with realistic threads and replies using the configured AI model. Data will be added in the background and progress will appear live below.</p>
+
+<form id="setupForm" method="post" action="/Setup/Start" class="space-y-3" hx-post="/Setup/Start" hx-target="#progress" hx-swap="innerHTML" hx-include="#setupForm">
+    @Html.AntiForgeryToken()
+    <div>
+        <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Forum Name</label>
+        <div class="flex gap-2 items-center">
+            <input id="ForumName" name="ForumName" class="input input-bordered flex-1" placeholder="e.g., Technology Discussion" required />
+            <button type="button" class="btn btn-sm" title="AI generate" auto-translate="true" translation-category="setup"
+                    hx-post="/Setup/GenForumName" hx-target="#ForumName" hx-swap="outerHTML"
+                    hx-include="#Description,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Description (optional)</label>
+        <div class="flex gap-2 items-center">
+            <input id="Description" name="Description" class="input input-bordered flex-1" placeholder="A place to discuss and share ideas" />
+            <button type="button" class="btn btn-sm" title="AI generate" auto-translate="true" translation-category="setup"
+                    hx-post="/Setup/GenDescription" hx-target="#Description" hx-swap="outerHTML"
+                    hx-include="#ForumName,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Site Purpose (optional)</label>
+        <div class="flex gap-2 items-center">
+            <input id="SitePurpose" name="SitePurpose" class="input input-bordered flex-1" placeholder="Brief description of what this forum is about" />
+            <button type="button" class="btn btn-sm" title="AI generate" auto-translate="true" translation-category="setup"
+                    hx-post="/Setup/GenSitePurpose" hx-target="#SitePurpose" hx-swap="outerHTML"
+                    hx-include="#ForumName,#Description,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Charter Description (optional)</label>
+        <div class="flex gap-2 items-center">
+            <input id="CharterDescription" name="CharterDescription" class="input input-bordered flex-1" placeholder="Guidelines and tone for generated content" />
+            <button type="button" class="btn btn-sm" title="AI generate" auto-translate="true" translation-category="setup"
+                    hx-post="/Setup/GenCharter" hx-target="#CharterDescription" hx-swap="outerHTML"
+                    hx-include="#ForumName,#Description,#SitePurpose,#setupForm input[name='__RequestVerificationToken']">AI</button>
+        </div>
+    </div>
+    <div class="flex gap-4 items-end flex-wrap">
+        <div>
+            <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Threads</label>
+            <input id="ThreadCount" name="ThreadCount" type="number" value="3" min="1" max="20" class="input input-bordered w-24" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium" auto-translate="true" translation-category="setup">Replies per thread</label>
+            <input id="RepliesPerThread" name="RepliesPerThread" type="number" value="2" min="0" max="20" class="input input-bordered w-24" />
+        </div>
+        <div class="flex items-center gap-2">
+            <input id="IncludeEmoticons" name="IncludeEmoticons" type="checkbox" class="checkbox" />
+            <label for="IncludeEmoticons" class="text-sm" auto-translate="true" translation-category="setup">Include emoticons (optional)</label>
+        </div>
+    </div>
+    <div class="flex gap-2 flex-wrap mt-4">
+        <button type="submit" class="btn btn-primary" auto-translate="true" translation-category="setup">Start Seeding</button>
+        <button type="button" class="btn btn-accent" title="AI: Generate all & start" auto-translate="true" translation-category="setup"
+                hx-post="/Setup/GenAllAndStart" hx-target="#progress" hx-swap="innerHTML"
+                hx-include="#ThreadCount,#RepliesPerThread,#IncludeEmoticons,#setupForm input[name='__RequestVerificationToken']">One-click Generate & Seed</button>
+    </div>
+</form>
+
+<div id="progress" class="mt-6 border rounded-box p-3 h-64 overflow-auto bg-base-200" data-hub-path="@LucidForums.Hubs.SeedingHub.HubPath">
+    <div class="text-base-content/70" auto-translate="true" translation-category="setup">No job started yet.</div>
+</div>
+I guess 

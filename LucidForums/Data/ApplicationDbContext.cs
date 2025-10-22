@@ -17,6 +17,9 @@ public class ApplicationDbContext : IdentityDbContext<User>
     public DbSet<Charter> Charters => Set<Charter>();
     public DbSet<ForumUser> ForumUsers => Set<ForumUser>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
+    public DbSet<TranslationString> TranslationStrings => Set<TranslationString>();
+    public DbSet<Translation> Translations => Set<Translation>();
+    public DbSet<ContentTranslation> ContentTranslations => Set<ContentTranslation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -143,6 +146,33 @@ public class ApplicationDbContext : IdentityDbContext<User>
         modelBuilder.Entity<AppSettings>(e =>
         {
             e.HasKey(x => x.Id);
+        });
+
+        // TranslationString
+        modelBuilder.Entity<TranslationString>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Key).IsUnique();
+            e.HasIndex(x => x.Category);
+        });
+
+        // Translation
+        modelBuilder.Entity<Translation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TranslationStringId, x.LanguageCode }).IsUnique();
+            e.HasOne(x => x.TranslationString)
+                .WithMany(ts => ts.Translations)
+                .HasForeignKey(x => x.TranslationStringId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ContentTranslation
+        modelBuilder.Entity<ContentTranslation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.ContentType, x.ContentId, x.FieldName, x.LanguageCode }).IsUnique();
+            e.HasIndex(x => new { x.ContentType, x.ContentId });
         });
 
         // Enable PostgreSQL ltree extension if using Npgsql
