@@ -1,39 +1,285 @@
 ﻿@model LucidForums.Models.ViewModels.SearchPageVm
 @{
-    ViewData["Title"] = Model.ForumSlug == null ? "Search" : $"Search {Model.ForumSlug}";
+    ViewData["Title"] = "Search";
 }
-<div class="container mt-4">
-    <h2>@ViewData["Title"]</h2>
-    <form method="get" class="mb-3" action="@(Model.ForumSlug == null ? Url.Action("Index", "Search") : Url.Action("Forum", "Search", new { slug = Model.ForumSlug }))">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="Search..." value="@Model.Query" />
-            <button class="btn btn-primary" type="submit">Search</button>
+
+<div class="container mx-auto px-4 py-6 max-w-6xl">
+    <h1 class="text-3xl font-bold mb-6">Search Forums</h1>
+
+    <form method="get" action="@Url.Action("Index", "Search")" class="space-y-4">
+        <!-- Search Query -->
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text font-semibold">Search Query</span>
+            </label>
+            <div class="join w-full">
+                <input type="text"
+                       name="q"
+                       class="input input-bordered join-item flex-1"
+                       placeholder="Enter your search terms..."
+                       value="@Model.Query"
+                       required />
+                <button type="submit" class="btn btn-primary join-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" @(Model.ForumId.HasValue || Model.MyPosts || Model.StartDate.HasValue || Model.EndDate.HasValue || Model.SearchMode != "hybrid" ? "checked" : "") />
+            <div class="collapse-title text-lg font-medium">
+                Advanced Filters
+            </div>
+            <div class="collapse-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <!-- Forum Filter -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Forum</span>
+                        </label>
+                        <select name="forumId" class="select select-bordered w-full">
+                            <option value="">All Forums</option>
+                            @foreach (var forum in Model.AvailableForums)
+                            {
+                                @if (Model.ForumId == forum.ForumId)
+                                {
+                                    <option value="@forum.ForumId" selected>@forum.ForumName</option>
+                                }
+                                else
+                                {
+                                    <option value="@forum.ForumId">@forum.ForumName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Search Mode -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Search Mode</span>
+                        </label>
+                        <select name="mode" class="select select-bordered w-full">
+                            @if (Model.SearchMode == "hybrid")
+                            {
+                                <option value="hybrid" selected>Hybrid (Recommended)</option>
+                            }
+                            else
+                            {
+                                <option value="hybrid">Hybrid (Recommended)</option>
+                            }
+                            @if (Model.SearchMode == "fulltext")
+                            {
+                                <option value="fulltext" selected>Full-Text Only</option>
+                            }
+                            else
+                            {
+                                <option value="fulltext">Full-Text Only</option>
+                            }
+                            @if (Model.SearchMode == "semantic")
+                            {
+                                <option value="semantic" selected>Semantic Only</option>
+                            }
+                            else
+                            {
+                                <option value="semantic">Semantic Only</option>
+                            }
+                        </select>
+                        <label class="label">
+                            <span class="label-text-alt">Hybrid combines keyword matching with AI-powered semantic search</span>
+                        </label>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Start Date</span>
+                        </label>
+                        <input type="date"
+                               name="startDate"
+                               class="input input-bordered w-full"
+                               value="@(Model.StartDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">End Date</span>
+                        </label>
+                        <input type="date"
+                               name="endDate"
+                               class="input input-bordered w-full"
+                               value="@(Model.EndDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+
+                    <!-- My Posts Filter -->
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="form-control">
+                            <label class="label cursor-pointer justify-start gap-2">
+                                @if (Model.MyPosts)
+                                {
+                                    <input type="checkbox"
+                                           name="myPosts"
+                                           value="true"
+                                           class="checkbox checkbox-primary"
+                                           checked />
+                                }
+                                else
+                                {
+                                    <input type="checkbox"
+                                           name="myPosts"
+                                           value="true"
+                                           class="checkbox checkbox-primary" />
+                                }
+                                <span class="label-text">Only my posts</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
     </form>
 
-    @if (Model.Results.Count == 0)
-    {
-        <div class="alert alert-info">No results</div>
-    }
-    else
-    {
-        <ul class="list-group">
-            @foreach (var r in Model.Results)
-            {
-                <li class="list-group-item">
-                    <div class="small text-muted">
-                        @if (Model.ForumSlug == null)
+    <!-- Results -->
+    <div class="mt-8">
+        @if (!string.IsNullOrWhiteSpace(Model.Query))
+        {
+            <div class="mb-4">
+                <h2 class="text-xl font-semibold">
+                    @if (Model.Results.Count == 0)
+                    {
+                        <span>No results found for "@Model.Query"</span>
+                    }
+                    else
+                    {
+                        <span>Found @Model.Results.Count result@(Model.Results.Count != 1 ? "s" : "") for "@Model.Query"</span>
+                    }
+                </h2>
+                @if (Model.Results.Count > 0)
+                {
+                    <p class="text-sm text-base-content/70 mt-1">
+                        Search mode: <span class="badge badge-sm">@Model.SearchMode</span>
+                        @if (Model.ForumId.HasValue)
                         {
-                            <span>Forum: <a href="@Url.Action("Details", "Forum", new { slug = r.ForumSlug })">@r.ForumSlug</a></span>
-                            <span> · </span>
+                            var selectedForum = Model.AvailableForums.FirstOrDefault(f => f.ForumId == Model.ForumId);
+                            if (selectedForum != null)
+                            {
+                                <span> • Forum: <span class="badge badge-sm badge-primary">@selectedForum.ForumName</span></span>
+                            }
                         }
-                        <span>Score: @r.Score.ToString("0.000")</span>
-                    </div>
+                        @if (Model.MyPosts)
+                        {
+                            <span> • <span class="badge badge-sm badge-secondary">My Posts Only</span></span>
+                        }
+                    </p>
+                }
+            </div>
+
+            @if (Model.Results.Count == 0)
+            {
+                <div class="alert alert-info">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                     <div>
-                        <a href="@Url.Action("Show", "Threads", new { id = r.ThreadId })#msg-@r.MessageId">@r.Snippet</a>
+                        <p>No matching messages found. Try:</p>
+                        <ul class="list-disc list-inside mt-2 ml-6">
+                            <li>Using different keywords</li>
+                            <li>Switching to a different search mode</li>
+                            <li>Removing filters to broaden your search</li>
+                            <li>Checking your spelling</li>
+                        </ul>
                     </div>
-                </li>
+                </div>
             }
-        </ul>
-    }
+            else
+            {
+                <div class="space-y-4">
+                    @foreach (var result in Model.Results)
+                    {
+                        <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
+                            <div class="card-body">
+                                <!-- Header with forum and metadata -->
+                                <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 mb-2">
+                                    <a href="@Url.Action("Details", "Forum", new { slug = result.ForumSlug })"
+                                       class="badge badge-outline badge-primary">
+                                        @result.ForumSlug
+                                    </a>
+                                    <span>•</span>
+                                    <span>By @result.AuthorName</span>
+                                    <span>•</span>
+                                    <time datetime="@result.CreatedAt.ToString("o")">
+                                        @result.CreatedAt.ToString("MMM d, yyyy")
+                                    </time>
+                                    <span>•</span>
+                                    <span class="tooltip" data-tip="Combined relevance score">
+                                        Score: @result.Score.ToString("0.000")
+                                    </span>
+                                    @if (result.SemanticScore.HasValue || result.FullTextScore.HasValue)
+                                    {
+                                        <div class="dropdown dropdown-end">
+                                            <label tabindex="0" class="btn btn-xs btn-ghost">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </label>
+                                            <div tabindex="0" class="dropdown-content z-[1] card card-compact w-64 p-2 shadow bg-base-200 text-base-content">
+                                                <div class="card-body">
+                                                    <h3 class="font-bold text-sm">Score Breakdown</h3>
+                                                    @if (result.FullTextScore.HasValue)
+                                                    {
+                                                        <p class="text-xs">Full-Text: @result.FullTextScore.Value.ToString("0.000")</p>
+                                                    }
+                                                    @if (result.SemanticScore.HasValue)
+                                                    {
+                                                        <p class="text-xs">Semantic: @result.SemanticScore.Value.ToString("0.000")</p>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Thread title -->
+                                <h3 class="card-title text-lg">
+                                    <a href="@Url.Action("Show", "Threads", new { id = result.ThreadId })#msg-@result.MessageId"
+                                       class="link link-hover">
+                                        @result.ThreadTitle
+                                    </a>
+                                </h3>
+
+                                <!-- Snippet -->
+                                <p class="text-base-content/80 line-clamp-3">
+                                    @result.Snippet
+                                </p>
+
+                                <!-- Actions -->
+                                <div class="card-actions justify-end mt-2">
+                                    <a href="@Url.Action("Show", "Threads", new { id = result.ThreadId })#msg-@result.MessageId"
+                                       class="btn btn-sm btn-primary">
+                                        View Message
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <div class="alert">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <h3 class="font-bold">Enter a search query to get started</h3>
+                    <div class="text-xs">Try searching for topics, keywords, or questions you're interested in.</div>
+                </div>
+            </div>
+        }
+    </div>
 </div>

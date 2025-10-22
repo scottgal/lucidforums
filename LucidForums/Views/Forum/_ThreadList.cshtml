@@ -1,5 +1,5 @@
 ﻿@model IEnumerable<LucidForums.Models.ViewModels.ThreadSummaryVm>
-<ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+<ul class="divide-y divide-base-200">
 @foreach (var t in Model)
 {
     @await Html.PartialAsync("_ThreadListItem", t)

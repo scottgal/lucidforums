@@ -11,14 +11,36 @@
             {
                 <p class="text-base-content/70 mt-1">@Model.Description</p>
             }
-            <div class="mt-3 flex flex-wrap gap-2 text-sm">
-                <span class="badge badge-outline">Threads: @Model.Threads?.Count()</span>
-                <span class="badge badge-ghost">Slug: @Model.Slug</span>
+            <div class="mt-3 flex flex-col gap-2 text-sm">
+                <div class="flex flex-wrap gap-2">
+                    <span class="badge badge-outline">Threads: @Model.ThreadCount</span>
+                    <span class="badge badge-ghost">Slug: @Model.Slug</span>
+                </div>
+                @if (Model.CharterId.HasValue || !string.IsNullOrWhiteSpace(Model.CharterName) || !string.IsNullOrWhiteSpace(Model.CharterPurpose))
+                {
+                    <div class="rounded-lg border border-base-300 p-3 bg-base-100/50">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="font-medium">Charter: @(string.IsNullOrWhiteSpace(Model.CharterName) ? "(unnamed)" : Model.CharterName)</div>
+                                @if (!string.IsNullOrWhiteSpace(Model.CharterPurpose))
+                                {
+                                    <div class="text-xs opacity-70 mt-1">@Model.CharterPurpose</div>
+                                }
+                            </div>
+                            @if (Model.CharterId.HasValue)
+                            {
+                                <div class="shrink-0">
+                                    <a class="btn btn-xs btn-ghost" href="@Url.Action("Details", "Charter", new { id = Model.CharterId!.Value })">View</a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
         </div>
         <div class="shrink-0">
             <button class="btn btn-primary"
-                    hx-get="@Url.RouteUrl(new { controller = "Forum", action = "CreateThread", forumId = Model.Id })"
+                    hx-get="@Url.Action("CreateThread", "Forum", new { forumId = Model.Id })"
                     hx-target="#create-thread"
                     hx-swap="innerHTML">
                 + New Thread

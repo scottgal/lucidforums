@@ -26,8 +26,8 @@ public class RuntimeAppMapper : IAppMapper
 
     public ThreadSummaryVm ToThreadSummaryVm(ForumThread src)
     {
-        // Keep parity with MapsterRegistration mapping
-        return new ThreadSummaryVm(src.Id, src.ForumId, src.Title, src.CreatedById, src.CreatedAtUtc);
+        // Keep parity with MapsterRegistration mapping; note ReplyCount/LastInteraction not available here
+        return new ThreadSummaryVm(src.Id, src.ForumId, src.Title, src.CreatedById, src.CreatedAtUtc, src.CharterScore, 0, src.CreatedAtUtc);
     }
 
     public IEnumerable<ThreadSummaryVm> ToThreadSummaryVms(IEnumerable<ForumThread> src)

@@ -23,13 +23,15 @@
     <div id="forums" class="flex items-center justify-between">
         <h2 class="text-2xl font-bold">Forums</h2>
         <div class="form-control">
-            <label class="input input-bordered flex items-center gap-2 w-64" hx-indicator>
+            <label class="input input-bordered flex items-center gap-2 w-64">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 opacity-70" viewBox="0 0 24 24" fill="currentColor"><path d="M21.707 20.293l-5.657-5.657A7.963 7.963 0 0018 10a8 8 0 10-8 8 7.963 7.963 0 004.636-1.95l5.657 5.657a1 1 0 001.414-1.414zM4 10a6 6 0 1112 0 6 6 0 01-12 0z"/></svg>
                 <input type="text" class="grow" name="q" placeholder="Search forums"
                        hx-get="@Url.Action("SearchForums", "Home")"
                        hx-trigger="keyup changed delay:300ms, search"
                        hx-target="#forums-list"
-                       hx-push-url="false" />
+                       hx-swap="innerHTML"
+                       hx-indicator=".htmx-indicator" />
+                <span class="htmx-indicator loading loading-spinner loading-sm"></span>
             </label>
         </div>
     </div>

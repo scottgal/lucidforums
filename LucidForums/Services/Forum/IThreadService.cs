@@ -111,6 +111,7 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
     public Task<List<ForumThread>> ListByForumAsync(Guid forumId, int skip = 0, int take = 50, CancellationToken ct = default)
     {
         return db.Threads.Where(t => t.ForumId == forumId)
+            .Include(t => t.Messages)
             .OrderByDescending(t => t.CreatedAtUtc)
             .Skip(skip).Take(take)
             .ToListAsync(ct);

@@ -1,14 +1,24 @@
 ﻿@model LucidForums.Models.ViewModels.ReplyVm
-<form method="post"
-      hx-post="@Url.Action("Reply", "Threads", new { id = Model.ThreadId })"
-      hx-target="#messages ul"
-      hx-swap="beforeend">
-    @Html.AntiForgeryToken()
-    <input type="hidden" asp-for="ThreadId" />
-    <input type="hidden" asp-for="ParentId" />
-    <div class="mb-2">
-        <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="3" placeholder="Write a reply..."></textarea>
-        <span asp-validation-for="Content" class="text-red-600 text-sm"></span>
+<div class="card bg-base-200 mt-4">
+    <div class="card-body py-3">
+        <form method="post"
+              hx-post="@Url.Action("Reply", "Threads", new { id = Model.ThreadId })"
+              hx-target="#messages ul"
+              hx-swap="beforeend"
+              hx-on::after-request="if(event.detail.successful) this.reset()">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="ThreadId" />
+            <input type="hidden" asp-for="ParentId" />
+            <div class="form-control mb-2">
+                <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="3" placeholder="Write a reply..."></textarea>
+                <label class="label">
+                    <span asp-validation-for="Content" class="label-text-alt text-error"></span>
+                </label>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.closest('.card').remove()">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-primary">Post Reply</button>
+            </div>
+        </form>
     </div>
-    <button type="submit" class="btn btn-sm btn-primary">Reply</button>
-</form>
+</div>

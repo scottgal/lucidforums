@@ -132,6 +132,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITagExtractionService, TagExtractionService>();
         services.AddScoped<IToneAdvisor, ToneAdvisor>();
         services.AddScoped<ICharterScoringService, CharterScoringService>();
+        // Search service
+        services.AddScoped<ISearchService, SearchService>();
         return services;
     }
 
