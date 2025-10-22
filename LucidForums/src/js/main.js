@@ -198,8 +198,8 @@ async function initTranslationHub() {
         connection.on('ContentTranslated', (data) => {
             const { contentType, contentId, fieldName, language, translatedText } = data;
 
-            // Get current user's selected language from cookie
-            const currentLanguage = getCookie('Language') || 'en';
+            // Get current user's selected language from cookie (must match server cookie name)
+            const currentLanguage = getCookie('preferred-language') || 'en';
 
             // Only update if this translation matches the user's current language
             if (language !== currentLanguage) {

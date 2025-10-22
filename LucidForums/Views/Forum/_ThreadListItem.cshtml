@@ -2,11 +2,11 @@
 <li id="thread-@Model.Id" class="py-3" data-thread-id="@Model.Id">
     <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-            <a class="text-base-content hover:link font-medium thread-title" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@Model.Title</a>
+            <a class="text-base-content hover:link font-medium thread-title" href="@Url.Action("Show", "Threads", new { id = Model.Id })" auto-translate="true" translation-category="thread.title">@Model.Title</a>
             <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-70">
                 <span>@Model.CreatedAtUtc.ToLocalTime().ToString("g")</span>
                 <span>•</span>
-                <span>@(string.IsNullOrWhiteSpace(Model.AuthorId) ? "anon" : Model.AuthorId)</span>
+                <span>@(string.IsNullOrWhiteSpace(Model.AuthorId) ? @Html.Raw("<span auto-translate=\"true\" translation-category=\"thread\">anon</span>") : Model.AuthorId)</span>
                 <span>•</span>
                 <span><span auto-translate="true" translation-category="forum">Charter:</span> @(Model.CharterScore?.ToString("0") ?? "-")</span>
                 <span>•</span>

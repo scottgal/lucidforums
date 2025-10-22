@@ -55,7 +55,7 @@
                     <div class="card-body py-3">
                         <div class="flex items-center justify-between gap-3">
                             <div class="truncate">
-                                <div class="font-semibold truncate">@t.Title</div>
+                                <div class="font-semibold truncate thread-title" data-thread-id="@t.Id" auto-translate="true" translation-category="thread.title">@t.Title</div>
                                 <div class="text-xs text-base-content/70">@t.CreatedAtUtc.ToLocalTime().ToString("g")</div>
                             </div>
                             <div class="badge" auto-translate="true" translation-category="home">Thread</div>
