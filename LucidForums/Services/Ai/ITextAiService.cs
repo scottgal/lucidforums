@@ -18,10 +18,20 @@ public interface ITextAiService
     Task<string> TranslateAsync(string text, string targetLanguage, CancellationToken ct = default);
 
     /// <summary>
+    /// Translate plain text into the target language from a specified or auto-detected source language.
+    /// </summary>
+    Task<string> TranslateAsync(string text, string targetLanguage, string? sourceLanguage, CancellationToken ct = default);
+
+    /// <summary>
     /// Stream a translation by invoking onChunk with pieces of the translated text as they become available.
     /// Implementations may fall back to chunking a full translation if streaming is not supported.
     /// </summary>
     Task TranslateStreamAsync(string text, string targetLanguage, Func<string, Task> onChunk, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stream a translation with a specified or auto-detected source language.
+    /// </summary>
+    Task TranslateStreamAsync(string text, string targetLanguage, string? sourceLanguage, Func<string, Task> onChunk, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the list of model IDs available from the currently configured provider.

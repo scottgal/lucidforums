@@ -96,6 +96,55 @@ public class TextAiService : ITextAiService
 
     public async Task<string> TranslateAsync(string text, string targetLanguage, CancellationToken ct = default)
     {
+        // Back-compat overload: no explicit source; delegate to new overload with sourceLanguage = null (auto-detect)
+        return await TranslateAsync(text, targetLanguage, (string?)null, ct);
+    }
+
+    private async Task<string> DetectLanguageNameAsync(string text, CancellationToken ct)
+    {
+        var charter = new Charter
+        {
+            Name = "LanguageDetector",
+            Purpose = "Detect the human language of the provided text and respond with only the English name of the language, e.g., 'English', 'Spanish', 'French'."
+        };
+        var prompt = new StringBuilder()
+            .AppendLine("Return ONLY the language name in English, with no punctuation or extra words.")
+            .AppendLine()
+            .AppendLine("Text:")
+            .AppendLine(text ?? string.Empty)
+            .ToString();
+        var detected = await GenerateAsync(charter, prompt, _aiSettings.TranslationModel ?? _options.CurrentValue.DefaultModel, ct);
+        detected = (detected ?? string.Empty).Trim();
+        // Normalize a bit: title case first letter
+        if (string.IsNullOrEmpty(detected)) return "English";
+        // Some models return codes; map a few common codes
+        var low = detected.ToLowerInvariant();
+        return low switch
+        {
+            "en" => "English",
+            "es" => "Spanish",
+            "fr" => "French",
+            "de" => "German",
+            "it" => "Italian",
+            "pt" => "Portuguese",
+            "ru" => "Russian",
+            "zh" or "zh-cn" or "zh-hans" => "Chinese",
+            "ja" => "Japanese",
+            "ko" => "Korean",
+            _ => char.ToUpperInvariant(detected[0]) + detected.Substring(1)
+        };
+    }
+
+    public async Task<string> TranslateAsync(string text, string targetLanguage, string? sourceLanguage, CancellationToken ct = default)
+    {
+        // Detect source language when missing or set to 'auto'
+        var src = string.IsNullOrWhiteSpace(sourceLanguage) || sourceLanguage!.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            ? await DetectLanguageNameAsync(text, ct)
+            : sourceLanguage!;
+        // If source and target look the same, short-circuit
+        if (string.Equals(src, targetLanguage, StringComparison.OrdinalIgnoreCase))
+            return text ?? string.Empty;
+        // Use provider translate (prompt already instructs to translate to target; most models infer source)
         var sw = Stopwatch.StartNew();
         var provider = ResolveProvider(_aiSettings.TranslationProvider);
         var cur = _options.CurrentValue;
@@ -104,12 +153,20 @@ public class TextAiService : ITextAiService
         {
             a?.SetTag(tcfg.Tags.Provider, provider.Name);
             a?.SetTag(tcfg.Tags.TargetLanguage, targetLanguage);
+            a?.SetTag("source.language", src);
             a?.SetTag(tcfg.Tags.InputLength, text?.Length ?? 0);
         });
         try
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
-            var result = await provider.TranslateAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
+            // Hint the source language by prefixing a short note; providers don't accept a source param
+            var toTranslate = text ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(src))
+            {
+                // Some models do better when told the source explicitly in the input
+                toTranslate = $"[Source language: {src}]\n\n" + toTranslate;
+            }
+            var result = await provider.TranslateAsync(toTranslate, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, ct);
             result = Sanitize(result);
             activity?.SetTag(tcfg.Tags.OutputLength, result?.Length ?? 0);
             return result;
@@ -131,6 +188,17 @@ public class TextAiService : ITextAiService
 
     public async Task TranslateStreamAsync(string text, string targetLanguage, Func<string, Task> onChunk, CancellationToken ct = default)
     {
+        // Back-compat overload: no explicit source; delegate to new overload with sourceLanguage = null (auto-detect)
+        await TranslateStreamAsync(text, targetLanguage, (string?)null, onChunk, ct);
+    }
+
+    public async Task TranslateStreamAsync(string text, string targetLanguage, string? sourceLanguage, Func<string, Task> onChunk, CancellationToken ct = default)
+    {
+        // Detect source language when missing or set to 'auto'
+        var src = string.IsNullOrWhiteSpace(sourceLanguage) || sourceLanguage!.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            ? await DetectLanguageNameAsync(text, ct)
+            : sourceLanguage!;
+
         var sw = Stopwatch.StartNew();
         var provider = ResolveProvider(_aiSettings.TranslationProvider);
         var cur = _options.CurrentValue;
@@ -139,13 +207,19 @@ public class TextAiService : ITextAiService
         {
             a?.SetTag(tcfg.Tags.Provider, provider.Name);
             a?.SetTag(tcfg.Tags.TargetLanguage, targetLanguage);
+            a?.SetTag("source.language", src);
             a?.SetTag(tcfg.Tags.InputLength, text?.Length ?? 0);
             a?.SetTag(tcfg.Tags.Streaming, true);
         });
         try
         {
             _requests.Add(1, new KeyValuePair<string, object?>(tcfg.Tags.Provider, provider.Name));
-            await provider.TranslateStreamAsync(text, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, onChunk, ct);
+            var toTranslate = text ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(src))
+            {
+                toTranslate = $"[Source language: {src}]\n\n" + toTranslate;
+            }
+            await provider.TranslateStreamAsync(toTranslate, targetLanguage, _aiSettings.TranslationModel ?? cur.DefaultModel, cur.Temperature, cur.MaxTokens, onChunk, ct);
         }
         catch (Exception ex)
         {

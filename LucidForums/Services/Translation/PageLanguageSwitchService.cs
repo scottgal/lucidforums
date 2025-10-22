@@ -8,6 +8,7 @@ using LucidForums.Services.Ai;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LucidForums.Services.Translation;
 
@@ -18,19 +19,22 @@ internal sealed class PageLanguageSwitchService : IPageLanguageSwitchService
     private readonly IHubContext<TranslationHub> _hubContext;
     private readonly ITextAiService _ai;
     private readonly ILogger<PageLanguageSwitchService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public PageLanguageSwitchService(
         ApplicationDbContext db,
         ITranslationService translationService,
         IHubContext<TranslationHub> hubContext,
         ITextAiService ai,
-        ILogger<PageLanguageSwitchService> logger)
+        ILogger<PageLanguageSwitchService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _db = db;
         _translationService = translationService;
         _hubContext = hubContext;
         _ai = ai;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<string> BuildSwitchResponseAsync(string languageCode, IEnumerable<string> keys, CancellationToken ct = default)
@@ -79,14 +83,22 @@ internal sealed class PageLanguageSwitchService : IPageLanguageSwitchService
 
         if (missing.Count > 0 && !string.Equals(languageCode, "en", StringComparison.OrdinalIgnoreCase))
         {
-            _ = Task.Run(() => BackgroundTranslateAsync(languageCode, missing, ct), CancellationToken.None);
+            _ = Task.Run(() => BackgroundTranslateAsync(languageCode, missing), CancellationToken.None);
         }
 
         return html.ToString();
     }
 
-    private async Task BackgroundTranslateAsync(string languageCode, List<(int Id, string Key, string DefaultText)> missing, CancellationToken ct)
+    private async Task BackgroundTranslateAsync(string languageCode, List<(int Id, string Key, string DefaultText)> missing)
     {
+        // Do NOT use the HTTP request CancellationToken or scoped services after the request ends.
+        // Create a new scope and use a fresh DbContext and TranslationService instance.
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var translationService = scope.ServiceProvider.GetRequiredService<ITranslationService>();
+
+        var bgCt = CancellationToken.None; // prevent disposal-related cancellations
+
         try
         {
             // Build batch and ask for JSON array response only
@@ -105,23 +117,22 @@ Respond with ONLY a JSON array of objects with properties: key, translated. Do n
 Input items (JSON array of {{ key, text }}):
 {jsonPayload}";
 
-            var aiResult = await _ai.GenerateAsync(charter, prompt, ct: ct);
+            var aiResult = await _ai.GenerateAsync(charter, prompt, ct: bgCt);
             var map = ParseBatchToMap(aiResult);
 
             foreach (var m in missing)
             {
-                ct.ThrowIfCancellationRequested();
                 if (!map.TryGetValue(m.Key, out var translated) || string.IsNullOrWhiteSpace(translated))
                 {
                     // Fallback per-item translate
-                    translated = await _translationService.TranslateAsync(m.DefaultText, languageCode, "en", ct);
+                    translated = await translationService.TranslateAsync(m.DefaultText, languageCode, "en", bgCt);
                 }
 
                 try
                 {
-                    var existing = await _db.Translations
+                    var existing = await db.Translations
                         .Where(t => t.TranslationStringId == m.Id && t.LanguageCode == languageCode)
-                        .FirstOrDefaultAsync(ct);
+                        .FirstOrDefaultAsync(bgCt);
 
                     if (existing != null)
                     {
@@ -131,7 +142,7 @@ Input items (JSON array of {{ key, text }}):
                     }
                     else
                     {
-                        _db.Translations.Add(new Models.Entities.Translation
+                        db.Translations.Add(new Models.Entities.Translation
                         {
                             TranslationStringId = m.Id,
                             LanguageCode = languageCode,
@@ -141,14 +152,14 @@ Input items (JSON array of {{ key, text }}):
                         });
                     }
 
-                    await _db.SaveChangesAsync(ct);
+                    await db.SaveChangesAsync(bgCt);
 
                     await _hubContext.Clients.All.SendAsync("StringTranslated", new
                     {
                         Key = m.Key,
                         LanguageCode = languageCode,
                         TranslatedText = translated
-                    }, ct);
+                    }, bgCt);
                 }
                 catch (Exception ex)
                 {

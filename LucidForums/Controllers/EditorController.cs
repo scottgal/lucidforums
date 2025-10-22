@@ -96,7 +96,7 @@ public class EditorController(ITextAiService textAiService) : Controller
 
     // SSE endpoint to stream translation
     [HttpGet]
-    public async Task TranslateStream([FromQuery] string text, [FromQuery] string lang, CancellationToken ct)
+    public async Task TranslateStream([FromQuery] string text, [FromQuery] string lang, [FromQuery] string? source, CancellationToken ct)
     {
         Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["X-Accel-Buffering"] = "no";
@@ -113,7 +113,7 @@ public class EditorController(ITextAiService textAiService) : Controller
         // Signal client to clear previous text
         await WriteSse("__reset__");
 
-        await textAiService.TranslateStreamAsync(text ?? string.Empty, lang ?? "English", async chunk =>
+        await textAiService.TranslateStreamAsync(text ?? string.Empty, lang ?? "English", source, async chunk =>
         {
             await WriteSse(chunk);
         }, ct);

@@ -141,14 +141,28 @@ public class TranslationService : ITranslationService
 
     public async Task<string> TranslateAsync(string text, string targetLanguage, string? sourceLanguage = "en", CancellationToken ct = default)
     {
+        var src = sourceLanguage;
+        if (string.IsNullOrWhiteSpace(src) || src.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            var detector = new Charter
+            {
+                Name = "LanguageDetector",
+                Purpose = "Detect the human language of the provided text and respond with only the English name of the language, e.g., 'English', 'Spanish', 'French'."
+            };
+            var detectPrompt = $"Return ONLY the language name in English, with no punctuation or extra words.\n\nText:\n{text}";
+            var detected = await _ai.GenerateAsync(detector, detectPrompt, ct: ct);
+            detected = (detected ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(detected)) src = "English"; else src = detected;
+        }
+
         // Create a charter for translation context
         var charter = new Charter
         {
             Name = "Translation",
-            Purpose = $"Translate text from {sourceLanguage} to {targetLanguage} accurately and naturally"
+            Purpose = $"Translate text from {src} to {targetLanguage} accurately and naturally"
         };
 
-        var prompt = $@"Translate the following text from {sourceLanguage} to {targetLanguage}.
+        var prompt = $@"Translate the following text from {src} to {targetLanguage}.
 Preserve formatting, placeholders (like {{0}}, {{name}}), and HTML tags if present.
 Return ONLY the translated text, no explanations.
 

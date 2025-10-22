@@ -148,6 +148,18 @@ class TranslationManager {
             langDisplay.textContent = this.currentLanguage.toUpperCase();
         }
 
+        // If a non-English language is already selected (via cookie or prior choice),
+        // immediately kick off the translation pass so first render matches selection.
+        // Use the HTMX/OOB path directly to avoid reloads and to populate missing strings.
+        const desiredLang = this.currentLanguage || 'en';
+        if (desiredLang && desiredLang.toLowerCase() !== 'en') {
+            // Defer to end of tick to ensure DOM is fully ready
+            setTimeout(() => {
+                // Call the HTMX path directly so we don't early-return due to equality check
+                this.switchLanguageHtmx(desiredLang);
+            }, 0);
+        }
+
         console.log(`Translation system initialized (current language: ${this.currentLanguage})`);
     }
 }

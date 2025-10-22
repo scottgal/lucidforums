@@ -32,6 +32,7 @@
     if (!auto || !auto.checked) { return; }
     const ta = document.getElementById('postText');
     const lang = document.getElementById('langSelect')?.value || 'English';
+    const source = document.getElementById('sourceLangSelect')?.value || 'auto';
     const text = (window.easyMDE ? window.easyMDE.value() : ta?.value) || '';
     const target = document.getElementById('translated');
     if (!target) return;
@@ -44,7 +45,7 @@
 
     // Build URL using data attributes if available; fallback to hard-coded route
     const baseUrl = document.body?.dataset?.translateUrl || '/Editor/TranslateStream';
-    const url = `${baseUrl}?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}`;
+    const url = `${baseUrl}?lang=${encodeURIComponent(lang)}&source=${encodeURIComponent(source)}&text=${encodeURIComponent(text)}`;
     const es = new EventSource(url);
     currentES = es;
 
