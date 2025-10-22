@@ -1,4 +1,5 @@
-﻿using LucidForums.Services.Seeding;
+﻿using LucidForums.Helpers;
+using LucidForums.Services.Seeding;
 using Microsoft.AspNetCore.Mvc;
 using LucidForums.Data;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using LucidForums.Extensions;
 
 namespace LucidForums.Controllers;
 
-public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore progress, Services.Ai.ITextAiService ai, ApplicationDbContext db) : Controller
+public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore progress, Services.Ai.ITextAiService ai, ApplicationDbContext db, TranslationHelper translator) : Controller
 {
     [HttpGet]
     public IActionResult Index()
@@ -27,7 +28,8 @@ public class SetupController(IForumSeedingQueue queue, ISeedingProgressStore pro
     {
         if (string.IsNullOrWhiteSpace(req.ForumName))
         {
-            ModelState.AddModelError("ForumName", "Forum name is required");
+            var errorMessage = await translator.T("setup.forum-name.required", "Forum name is required");
+            ModelState.AddModelError("ForumName", errorMessage);
             Response.StatusCode = 400;
             return View("Index");
         }

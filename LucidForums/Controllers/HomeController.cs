@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using LucidForums.Models;
+using LucidForums.Extensions;
 
 namespace LucidForums.Controllers;
 

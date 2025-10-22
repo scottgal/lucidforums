@@ -12,7 +12,7 @@ public interface IMessageService
     Task<List<Message>> ListByThreadAsync(Guid threadId, CancellationToken ct = default);
 }
 
-public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, LucidForums.Services.Analysis.IToneAdvisor toneAdvisor, LucidForums.Services.Analysis.ICharterScoringService charterScoring) : IMessageService
+public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, LucidForums.Services.Analysis.IToneAdvisor toneAdvisor, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Translation.IContentTranslationQueue translationQueue) : IMessageService
 {
     public Task<Message?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -53,6 +53,9 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
         msg.Path = string.IsNullOrEmpty(parentPath) ? msg.Id.ToString("N") : parentPath + "." + msg.Id.ToString("N");
         db.Entry(msg).Property(x => x.Path).IsModified = true;
         await db.SaveChangesAsync(ct);
+
+        // Queue message for translation into all available languages
+        translationQueue.QueueMessageTranslation(msg.Id, msg.Content);
 
         // Extract tags and tone/charter advice, but do NOT modify message content
         try

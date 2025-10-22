@@ -1,3 +1,4 @@
+using LucidForums.Helpers;
 using LucidForums.Services.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -5,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LucidForums.Controllers;
 
 [Authorize(Roles = "Administrator")]
-public class AdminMaintenanceController(IAdminMaintenanceService maintenanceService) : Controller
+public class AdminMaintenanceController(IAdminMaintenanceService maintenanceService, TranslationHelper translator) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -25,11 +26,13 @@ public class AdminMaintenanceController(IAdminMaintenanceService maintenanceServ
         try
         {
             var indexedCount = await maintenanceService.IndexAllMessagesAsync(ct);
-            TempData["SuccessMessage"] = $"Successfully indexed {indexedCount} messages for semantic search.";
+            var template = await translator.T("admin.index-messages.success", "Successfully indexed {0} messages for semantic search.");
+            TempData["SuccessMessage"] = string.Format(template, indexedCount);
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = $"Error during indexing: {ex.Message}";
+            var template = await translator.T("admin.index-messages.error", "Error during indexing: {0}");
+            TempData["ErrorMessage"] = string.Format(template, ex.Message);
         }
 
         return RedirectToAction(nameof(Index));
@@ -42,11 +45,12 @@ public class AdminMaintenanceController(IAdminMaintenanceService maintenanceServ
         try
         {
             await maintenanceService.ClearContentAsync(ct);
-            TempData["SuccessMessage"] = "All content has been cleared successfully.";
+            TempData["SuccessMessage"] = await translator.T("admin.clear-content-maintenance.success", "All content has been cleared successfully.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = $"Error clearing content: {ex.Message}";
+            var template = await translator.T("admin.clear-content-maintenance.error", "Error clearing content: {0}");
+            TempData["ErrorMessage"] = string.Format(template, ex.Message);
         }
 
         return RedirectToAction(nameof(Index));

@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using LucidForums.Data;
+using LucidForums.Hubs;
 using LucidForums.Models.Entities;
 using LucidForums.Services.Ai;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace LucidForums.Services.Translation;
@@ -12,15 +14,18 @@ public class ContentTranslationService : IContentTranslationService
     private readonly ApplicationDbContext _db;
     private readonly ITextAiService _ai;
     private readonly ILogger<ContentTranslationService> _logger;
+    private readonly IHubContext<TranslationHub> _hubContext;
 
     public ContentTranslationService(
         ApplicationDbContext db,
         ITextAiService ai,
-        ILogger<ContentTranslationService> logger)
+        ILogger<ContentTranslationService> logger,
+        IHubContext<TranslationHub> hubContext)
     {
         _db = db;
         _ai = ai;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     public async Task<string?> GetTranslationAsync(string contentType, string contentId, string fieldName, string languageCode, CancellationToken ct = default)
@@ -95,6 +100,29 @@ Text to translate:
         }
 
         await _db.SaveChangesAsync(ct);
+
+        // Broadcast the translation via SignalR so connected clients can update in real-time
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _hubContext.Clients.All.SendAsync(
+                    "ContentTranslated",
+                    new
+                    {
+                        contentType,
+                        contentId,
+                        fieldName,
+                        language = targetLanguage,
+                        translatedText
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to broadcast translation via SignalR");
+            }
+        });
+
         return translatedText;
     }
 

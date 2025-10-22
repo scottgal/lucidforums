@@ -1,6 +1,6 @@
 ﻿@model LucidForums.Models.ViewModels.MessageVm
-<li id="msg-@Model.Id" class="p-2 border rounded" style="margin-left:@(Model.Depth * 16)px">
-    <div class="prose max-w-none">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>") )</div>
+<li id="msg-@Model.Id" class="p-2 border rounded" style="margin-left:@(Model.Depth * 16)px" data-message-id="@Model.Id">
+    <div class="prose max-w-none message-content">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>") )</div>
     <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">
         <span>@Model.CreatedAtUtc.ToString("g")</span>
         @if (Model.CharterScore.HasValue)

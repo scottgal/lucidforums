@@ -43,10 +43,6 @@ public class ForumController(IForumService forumService, IThreadService threadSe
             forum.Charter?.Purpose,
             threadVms);
 
-        // If HTMX request, return just the thread list partial
-        if (Request.IsHtmxRequest())
-            return PartialView("_ThreadList", threadVms);
-
         return View(vm);
     }
 

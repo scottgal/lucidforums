@@ -100,6 +100,14 @@ htmx.onLoad(function(content) {
 // ======================
 registerSweetAlertHxIndicator();
 
+// Helper function to get cookie value
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
 // TranslationHub: live per-string updates via SignalR
 async function initTranslationHub() {
     // Simple style injection for element highlight and progress chip
@@ -184,6 +192,49 @@ async function initTranslationHub() {
 
         connection.on('TranslationComplete', () => {
             completeProgressUI();
+        });
+
+        // Listen for content translation updates (user-generated content like messages)
+        connection.on('ContentTranslated', (data) => {
+            const { contentType, contentId, fieldName, language, translatedText } = data;
+
+            // Get current user's selected language from cookie
+            const currentLanguage = getCookie('Language') || 'en';
+
+            // Only update if this translation matches the user's current language
+            if (language !== currentLanguage) {
+                return;
+            }
+
+            // For messages, look for message container with data-message-id
+            if (contentType === 'Message' && fieldName === 'Content') {
+                const messageElement = document.querySelector(`[data-message-id="${contentId}"]`);
+                if (messageElement) {
+                    const contentElement = messageElement.querySelector('.message-content');
+                    if (contentElement) {
+                        // Encode HTML and replace newlines with <br/> to match the server rendering
+                        const encodedText = translatedText
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#039;')
+                            .replace(/\n/g, '<br/>');
+                        contentElement.innerHTML = encodedText;
+
+                        // Add visual indicator with fade effect
+                        messageElement.classList.add('lf-translation-updating');
+                        contentElement.style.transition = 'opacity 0.3s';
+                        contentElement.style.opacity = '0.7';
+                        setTimeout(() => {
+                            contentElement.style.opacity = '1';
+                            setTimeout(() => {
+                                messageElement.classList.remove('lf-translation-updating');
+                            }, 300);
+                        }, 100);
+                    }
+                }
+            }
         });
 
         await connection.start();

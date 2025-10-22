@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace LucidForums.Hubs;
 
 /// <summary>
-/// SignalR hub for broadcasting translation progress updates
+/// SignalR hub for broadcasting translation progress and content translation updates
 /// </summary>
 public class TranslationHub : Hub
 {
@@ -47,5 +47,28 @@ public class TranslationHub : Hub
             LanguageCode = languageCode,
             TranslatedText = translatedText
         });
+    }
+
+    /// <summary>
+    /// Join a content-specific group to receive translation updates
+    /// </summary>
+    public async Task JoinContentGroup(string contentType, string contentId)
+    {
+        var groupName = GetGroupName(contentType, contentId);
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+    }
+
+    /// <summary>
+    /// Leave a content-specific group
+    /// </summary>
+    public async Task LeaveContentGroup(string contentType, string contentId)
+    {
+        var groupName = GetGroupName(contentType, contentId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+    }
+
+    public static string GetGroupName(string contentType, string contentId)
+    {
+        return $"{contentType}:{contentId}";
     }
 }
