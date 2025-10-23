@@ -1,23 +1,27 @@
 ﻿@model LucidForums.Models.ViewModels.MessageVm
 @inject LucidForums.Helpers.TranslationHelper translator
+@{
+    var translatedContent = await translator.TranslateContentAsync("Message", Model.Id.ToString(), "Content", Model.Content);
+    var hasTranslation = translator.NeedsTranslation() && !string.Equals(translatedContent, Model.Content, StringComparison.Ordinal);
+}
 <li id="msg-@Model.Id" class="p-2 border rounded" style="margin-left:@(Model.Depth * 16)px" data-message-id="@Model.Id">
-    <div x-data="{ tab: '@(Model.IsTranslated ? "translated" : "original")' }">
-        @if (Model.IsTranslated)
+    <div x-data="{ tab: '@(hasTranslation ? "translated" : "original")' }">
+        @if (hasTranslation)
         {
             <div role="tablist" class="tabs tabs-bordered mb-2">
                 <a role="tab" class="tab" x-bind:class="{ 'tab-active': tab === 'original' }" x-on:click.prevent="tab = 'original'" auto-translate="true" translation-category="thread.message.tab">Original</a>
                 <a role="tab" class="tab" x-bind:class="{ 'tab-active': tab === 'translated' }" x-on:click.prevent="tab = 'translated'" auto-translate="true" translation-category="thread.message.tab">Translated</a>
             </div>
             <div x-show="tab === 'translated'" class="prose max-w-none message-content">
-                @Html.Raw(System.Net.WebUtility.HtmlEncode(Model.TranslatedContent ?? Model.Content).Replace("\n", "<br/>") )
+                @Html.Raw(System.Net.WebUtility.HtmlEncode(translatedContent).Replace("\n", "<br/>"))
             </div>
             <div x-show="tab === 'original'" class="prose max-w-none message-content">
-                @Html.Raw(System.Net.WebUtility.HtmlEncode(Model.OriginalContent).Replace("\n", "<br/>") )
+                @Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>"))
             </div>
         }
         else
         {
-            <div class="prose max-w-none message-content">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.OriginalContent).Replace("\n", "<br/>") )</div>
+            <div class="prose max-w-none message-content">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>"))</div>
         }
     </div>
     <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">

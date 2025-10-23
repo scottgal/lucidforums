@@ -1,0 +1,79 @@
+@model IEnumerable<LucidForums.Models.ViewModels.ThreadSummaryVm>
+@inject LucidForums.Helpers.TranslationHelper translator
+
+@if (Model != null && Model.Any())
+{
+    foreach (var t in Model)
+    {
+        <a class="card bg-base-100 hover:shadow transition-shadow border border-base-300 thread-card"
+           href="@Url.Action("Show", "Threads", new { id = t.Id })"
+           data-thread-id="@t.Id"
+           style="animation: slideIn 0.3s ease-out;">
+            <div class="card-body py-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold truncate thread-title" data-thread-id="@t.Id">@(await translator.TranslateContentAsync("Thread", t.Id.ToString(), "Title", t.Title))</div>
+                        <div class="flex items-center gap-2 text-xs text-base-content/70 mt-1">
+                            <span>@t.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                            @if (t.ReplyCount > 0)
+                            {
+                                <span>•</span>
+                                <span class="flex items-center gap-1">
+                                    <i class='bx bx-message-rounded'></i>
+                                    <span>@t.ReplyCount</span>
+                                </span>
+                            }
+                            @if (t.LastInteractionUtc != t.CreatedAtUtc)
+                            {
+                                <span>•</span>
+                                <span class="text-success">
+                                    <i class='bx bx-time-five'></i> @t.LastInteractionUtc.ToLocalTime().ToString("g")
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if (t.CharterScore.HasValue)
+                        {
+                            <div class="badge badge-sm" title="Charter Score">@t.CharterScore.Value.ToString("0")</div>
+                        }
+                        <div class="badge badge-ghost">Thread</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    }
+}
+else
+{
+    <div class="alert">
+        <i class='bx bx-info-circle'></i>
+        <span auto-translate="true" translation-category="home">No threads yet. Open a forum and start a new thread.</span>
+    </div>
+}
+
+<style>
+@@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.thread-card.new-thread {
+    animation: slideIn 0.3s ease-out, pulse 0.6s ease-in-out;
+}
+
+@@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(96, 165, 250, 0.3);
+    }
+}
+</style>

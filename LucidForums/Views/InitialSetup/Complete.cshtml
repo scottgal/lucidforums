@@ -1,0 +1,232 @@
+@{
+    ViewData["Title"] = "Complete Site Setup";
+    Layout = "_Layout";
+}
+
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl w-full space-y-8">
+        <div class="text-center">
+            <i class='bx bx-rocket text-6xl text-primary'></i>
+            <h2 class="mt-6 text-3xl font-extrabold">
+                Complete Site Setup
+            </h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                Create your admin account and generate sample content in one click
+            </p>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl" id="setupCard">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class='bx bx-shield-alt-2'></i>
+                    Administrator Account
+                </h3>
+
+                <form method="post" action="/initial-setup/complete-setup" id="setupForm" class="space-y-4">
+                    @Html.AntiForgeryToken()
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-envelope'></i>
+                                <span>Email Address</span>
+                            </span>
+                        </label>
+                        <input name="Email" type="email" class="input input-bordered" placeholder="admin@example.com" required autofocus />
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-user'></i>
+                                <span>Username</span>
+                            </span>
+                        </label>
+                        <input name="Username" type="text" class="input input-bordered" placeholder="admin" required />
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-lock-alt'></i>
+                                <span>Password</span>
+                            </span>
+                        </label>
+                        <input name="Password" type="password" class="input input-bordered" placeholder="••••••••" required />
+                        <label class="label">
+                            <span class="label-text-alt">Minimum 8 characters</span>
+                        </label>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-lock-alt'></i>
+                                <span>Confirm Password</span>
+                            </span>
+                        </label>
+                        <input name="ConfirmPassword" type="password" class="input input-bordered" placeholder="••••••••" required />
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class='bx bx-info-circle'></i>
+                        <div class="text-sm">
+                            <p class="font-semibold">This will automatically:</p>
+                            <ul class="list-disc list-inside mt-2 space-y-1">
+                                <li>Create your administrator account</li>
+                                <li>Generate 12 forums with diverse topics</li>
+                                <li>Create 60 realistic user accounts</li>
+                                <li>Populate with 120+ discussion threads</li>
+                                <li>Add 600+ messages and replies</li>
+                                <li>Generate semantic embeddings for all content</li>
+                            </ul>
+                            <p class="mt-2 text-xs text-warning">This process may take 3-5 minutes. Progress will be shown below.</p>
+                        </div>
+                    </div>
+
+                    <div class="card-actions justify-end pt-4">
+                        <button type="submit" class="btn btn-primary btn-block" id="setupBtn">
+                            <i class='bx bx-rocket'></i>
+                            <span>Complete Setup & Generate Site</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Progress Display -->
+        <div id="progressCard" class="card bg-base-100 shadow-xl hidden">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class='bx bx-loader-alt bx-spin'></i>
+                    <span id="progressTitle">Setting up your site...</span>
+                </h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span id="progressMessage">Initializing...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <progress class="progress progress-primary w-full" value="0" max="100" id="progressBar"></progress>
+                    </div>
+
+                    <div id="progressLog" class="bg-base-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                        <div class="text-xs font-mono space-y-1" id="logEntries">
+                            <!-- Progress log entries will appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+<script>
+    const form = document.getElementById('setupForm');
+    const setupBtn = document.getElementById('setupBtn');
+    const setupCard = document.getElementById('setupCard');
+    const progressCard = document.getElementById('progressCard');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressMessage = document.getElementById('progressMessage');
+    const progressTitle = document.getElementById('progressTitle');
+    const logEntries = document.getElementById('logEntries');
+
+    let connection = null;
+
+    // Setup SignalR connection
+    async function setupSignalR() {
+        connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/setup")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ProgressUpdate", (message, percent) => {
+            progressBar.value = percent;
+            progressPercent.textContent = percent + '%';
+            progressMessage.textContent = message;
+
+            // Add to log
+            const entry = document.createElement('div');
+            entry.className = 'text-success';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEntries.appendChild(entry);
+            logEntries.parentElement.scrollTop = logEntries.parentElement.scrollHeight;
+        });
+
+        connection.on("SetupComplete", (message, result) => {
+            progressBar.value = 100;
+            progressPercent.textContent = '100%';
+            progressTitle.innerHTML = '<i class="bx bx-check-circle"></i> Setup Complete!';
+            progressMessage.textContent = message;
+
+            const entry = document.createElement('div');
+            entry.className = 'text-success font-bold';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ✓ ${message}`;
+            logEntries.appendChild(entry);
+
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        });
+
+        connection.on("SetupError", (message) => {
+            progressTitle.innerHTML = '<i class="bx bx-error-circle"></i> Setup Failed';
+            progressMessage.textContent = message;
+
+            const entry = document.createElement('div');
+            entry.className = 'text-error font-bold';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ✗ ERROR: ${message}`;
+            logEntries.appendChild(entry);
+
+            setupBtn.disabled = false;
+            setupBtn.innerHTML = '<i class="bx bx-error"></i> Setup Failed - Try Again';
+        });
+
+        try {
+            await connection.start();
+            console.log("SignalR connected");
+        } catch (err) {
+            console.error("SignalR connection error:", err);
+        }
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Setup SignalR first
+        await setupSignalR();
+
+        // Hide setup form, show progress
+        setupCard.classList.add('hidden');
+        progressCard.classList.remove('hidden');
+
+        setupBtn.disabled = true;
+        setupBtn.innerHTML = '<span class="loading loading-spinner"></span> Setting up...';
+
+        // Submit form
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('/initial-setup/complete-setup', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error);
+            }
+        } catch (error) {
+            console.error('Setup error:', error);
+            progressTitle.innerHTML = '<i class="bx bx-error-circle"></i> Setup Failed';
+            progressMessage.textContent = error.message;
+            setupBtn.disabled = false;
+            setupBtn.innerHTML = '<i class="bx bx-error"></i> Setup Failed - Try Again';
+        }
+    });
+</script>
+}

@@ -15,6 +15,7 @@ public class ContentTranslationService : IContentTranslationService
     private readonly ITextAiService _ai;
     private readonly ILogger<ContentTranslationService> _logger;
     private readonly IHubContext<TranslationHub> _hubContext;
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
 
     public ContentTranslationService(
         ApplicationDbContext db,
@@ -30,33 +31,90 @@ public class ContentTranslationService : IContentTranslationService
 
     public async Task<string?> GetTranslationAsync(string contentType, string contentId, string fieldName, string languageCode, CancellationToken ct = default)
     {
-        var translation = await _db.ContentTranslations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t =>
-                t.ContentType == contentType &&
-                t.ContentId == contentId &&
-                t.FieldName == fieldName &&
-                t.LanguageCode == languageCode &&
-                !t.IsStale, ct);
+        await _dbLock.WaitAsync(ct);
+        try
+        {
+            var translation = await _db.ContentTranslations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t =>
+                    t.ContentType == contentType &&
+                    t.ContentId == contentId &&
+                    t.FieldName == fieldName &&
+                    t.LanguageCode == languageCode &&
+                    !t.IsStale, ct);
 
-        return translation?.TranslatedText;
+            return translation?.TranslatedText;
+        }
+        finally
+        {
+            _dbLock.Release();
+        }
     }
 
     public async Task<string> TranslateContentAsync(string contentType, string contentId, string fieldName, string sourceText, string targetLanguage, CancellationToken ct = default)
     {
         var sourceHash = ComputeHash(sourceText);
+        ContentTranslation? existing = null;
 
-        // Check if we have a valid cached translation
-        var existing = await _db.ContentTranslations
-            .FirstOrDefaultAsync(t =>
-                t.ContentType == contentType &&
-                t.ContentId == contentId &&
-                t.FieldName == fieldName &&
-                t.LanguageCode == targetLanguage, ct);
-
-        if (existing != null && existing.SourceHash == sourceHash && !existing.IsStale)
+        await _dbLock.WaitAsync(ct);
+        try
         {
-            return existing.TranslatedText;
+            // OPTIMIZATION: First check if ANY content with this hash + language already has a translation
+            // This allows reusing translations across different threads/messages with identical content
+            var reusableTranslation = await _db.ContentTranslations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t =>
+                    t.SourceHash == sourceHash &&
+                    t.LanguageCode == targetLanguage &&
+                    !t.IsStale, ct);
+
+            if (reusableTranslation != null)
+            {
+                // Found a reusable translation! Store a reference for this specific content
+                var reference = await _db.ContentTranslations
+                    .FirstOrDefaultAsync(t =>
+                        t.ContentType == contentType &&
+                        t.ContentId == contentId &&
+                        t.FieldName == fieldName &&
+                        t.LanguageCode == targetLanguage, ct);
+
+                if (reference == null)
+                {
+                    // Create a reference entry pointing to the same translation
+                    reference = new ContentTranslation
+                    {
+                        ContentType = contentType,
+                        ContentId = contentId,
+                        FieldName = fieldName,
+                        LanguageCode = targetLanguage,
+                        TranslatedText = reusableTranslation.TranslatedText,
+                        SourceHash = sourceHash,
+                        Source = reusableTranslation.Source,
+                        AiModel = reusableTranslation.AiModel
+                    };
+                    _db.ContentTranslations.Add(reference);
+                    await _db.SaveChangesAsync(ct);
+                }
+
+                return reusableTranslation.TranslatedText;
+            }
+
+            // Check if we have a cached translation for this specific content
+            existing = await _db.ContentTranslations
+                .FirstOrDefaultAsync(t =>
+                    t.ContentType == contentType &&
+                    t.ContentId == contentId &&
+                    t.FieldName == fieldName &&
+                    t.LanguageCode == targetLanguage, ct);
+
+            if (existing != null && existing.SourceHash == sourceHash && !existing.IsStale)
+            {
+                return existing.TranslatedText;
+            }
+        }
+        finally
+        {
+            _dbLock.Release();
         }
 
         // Notify clients that this content has been queued for translation (for subtle UI framing)
@@ -97,31 +155,39 @@ Text to translate:
         var translatedText = await _ai.GenerateAsync(charter, prompt, ct: ct);
         translatedText = translatedText?.Trim() ?? sourceText;
 
-        // Save or update translation
-        if (existing != null)
+        // Save or update translation (with lock to prevent concurrent DbContext access)
+        await _dbLock.WaitAsync(ct);
+        try
         {
-            existing.TranslatedText = translatedText;
-            existing.SourceHash = sourceHash;
-            existing.IsStale = false;
-            existing.UpdatedAtUtc = DateTime.UtcNow;
-        }
-        else
-        {
-            var newTranslation = new ContentTranslation
+            if (existing != null)
             {
-                ContentType = contentType,
-                ContentId = contentId,
-                FieldName = fieldName,
-                LanguageCode = targetLanguage,
-                TranslatedText = translatedText,
-                SourceHash = sourceHash,
-                Source = TranslationSource.AiGenerated,
-                AiModel = "Content Translation AI"
-            };
-            _db.ContentTranslations.Add(newTranslation);
-        }
+                existing.TranslatedText = translatedText;
+                existing.SourceHash = sourceHash;
+                existing.IsStale = false;
+                existing.UpdatedAtUtc = DateTime.UtcNow;
+            }
+            else
+            {
+                var newTranslation = new ContentTranslation
+                {
+                    ContentType = contentType,
+                    ContentId = contentId,
+                    FieldName = fieldName,
+                    LanguageCode = targetLanguage,
+                    TranslatedText = translatedText,
+                    SourceHash = sourceHash,
+                    Source = TranslationSource.AiGenerated,
+                    AiModel = "Content Translation AI"
+                };
+                _db.ContentTranslations.Add(newTranslation);
+            }
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            _dbLock.Release();
+        }
 
         // Broadcast the translation via SignalR so connected clients can update in real-time
         _ = Task.Run(async () =>

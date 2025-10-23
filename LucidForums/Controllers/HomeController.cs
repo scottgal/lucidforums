@@ -123,6 +123,37 @@ public class HomeController : Controller
         return PartialView("_ForumCards", forumVms);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> RecentThreads(CancellationToken ct)
+    {
+        var latestThreads = await _threadService.ListLatestAsync(take: 10, ct: ct);
+
+        // Trigger thread title translations for current language (fire-and-forget)
+        var language = _translationHelper.GetCurrentLanguage();
+        if (!string.IsNullOrWhiteSpace(language) && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var thread in latestThreads ?? Enumerable.Empty<LucidForums.Models.Entities.ForumThread>())
+            {
+                try
+                {
+                    var id = thread.Id.ToString();
+                    var existingTitle = await _contentTranslationService.GetTranslationAsync("Thread", id, "Title", language, ct);
+                    if (string.IsNullOrWhiteSpace(existingTitle))
+                    {
+                        _ = _contentTranslationService.TranslateContentAsync("Thread", id, "Title", thread.Title, language, ct);
+                    }
+                }
+                catch
+                {
+                    // Best-effort; do not block response
+                }
+            }
+        }
+
+        var threadVms = _mapper.ToThreadSummaryVms(latestThreads).ToList();
+        return PartialView("_RecentThreads", threadVms);
+    }
+
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

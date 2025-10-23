@@ -43,6 +43,7 @@ import './editor.js'
 import './pages/admin-ai-settings.js'
 import './pages/admin-ai-test.js'
 import './pages/setup.js'
+import './pages/home-live.js'
 import * as signalR from '@microsoft/signalr';
 // ======================
 // 4) INITIAL SETUP

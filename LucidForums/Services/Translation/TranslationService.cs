@@ -108,14 +108,21 @@ public class TranslationService : ITranslationService
             }
 
             // Get translation from database using AsNoTracking to avoid concurrency issues
-            // Use split queries to avoid concurrent access
-            var translationString = await _db.TranslationStrings
+            // Use a single query with Include to avoid multiple DbContext operations
+            var translationData = await _db.TranslationStrings
                 .AsNoTracking()
                 .Where(ts => ts.Key == key)
-                .Select(ts => new { ts.DefaultText })
+                .Select(ts => new
+                {
+                    ts.DefaultText,
+                    Translation = ts.Translations
+                        .Where(t => t.LanguageCode == lang)
+                        .Select(t => t.TranslatedText)
+                        .FirstOrDefault()
+                })
                 .FirstOrDefaultAsync(ct);
 
-            if (translationString == null)
+            if (translationData == null)
             {
                 _logger.LogWarning("Translation string not found for key: {Key}", key);
                 return key; // Return key as fallback
@@ -124,19 +131,15 @@ public class TranslationService : ITranslationService
             // If requesting default language, return default text
             if (lang == "en")
             {
-                _cache.Set(cacheKey, translationString.DefaultText, TimeSpan.FromHours(1));
-                _requestCache.Set(lang, key, translationString.DefaultText);
-                return translationString.DefaultText;
+                _cache.Set(cacheKey, translationData.DefaultText, TimeSpan.FromHours(1));
+                _requestCache.Set(lang, key, translationData.DefaultText);
+                return translationData.DefaultText;
             }
 
-            // Get the translation for this specific language
-            var translation = await _db.Translations
-                .AsNoTracking()
-                .Where(t => t.TranslationString!.Key == key && t.LanguageCode == lang)
-                .Select(t => t.TranslatedText)
-                .FirstOrDefaultAsync(ct);
-
-            var result = string.IsNullOrWhiteSpace(translation) ? translationString.DefaultText : translation;
+            // Use translation if available, otherwise fall back to default text
+            var result = string.IsNullOrWhiteSpace(translationData.Translation)
+                ? translationData.DefaultText
+                : translationData.Translation;
             _cache.Set(cacheKey, result, TimeSpan.FromHours(1));
             _requestCache.Set(lang, key, result);
             return result;
@@ -152,10 +155,9 @@ public class TranslationService : ITranslationService
         await _dbLock.WaitAsync(ct);
         try
         {
+            // Use a single tracked query to avoid mixing tracked/untracked
             var existing = await _db.TranslationStrings
-                .AsNoTracking()
                 .Where(ts => ts.Key == key)
-                .Select(ts => new { ts.Id, ts.DefaultText })
                 .FirstOrDefaultAsync(ct);
 
             if (existing != null)
@@ -163,15 +165,11 @@ public class TranslationService : ITranslationService
                 // Update if default text changed
                 if (existing.DefaultText != defaultText)
                 {
-                    var toUpdate = await _db.TranslationStrings.FindAsync(new object[] { existing.Id }, ct);
-                    if (toUpdate != null)
-                    {
-                        toUpdate.DefaultText = defaultText;
-                        toUpdate.UpdatedAtUtc = DateTime.UtcNow;
-                        await _db.SaveChangesAsync(ct);
-                        // Invalidate default language cache so UI picks up updated default immediately
-                        _cache.Remove($"trans:en:{key}");
-                    }
+                    existing.DefaultText = defaultText;
+                    existing.UpdatedAtUtc = DateTime.UtcNow;
+                    await _db.SaveChangesAsync(ct);
+                    // Invalidate default language cache so UI picks up updated default immediately
+                    _cache.Remove($"trans:en:{key}");
                 }
                 return existing.Id;
             }

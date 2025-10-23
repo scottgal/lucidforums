@@ -9,11 +9,13 @@ namespace LucidForums.Helpers;
 public class TranslationHelper
 {
     private readonly ITranslationService _translationService;
+    private readonly IContentTranslationService _contentTranslationService;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public TranslationHelper(ITranslationService translationService, IHttpContextAccessor httpContextAccessor)
+    public TranslationHelper(ITranslationService translationService, IContentTranslationService contentTranslationService, IHttpContextAccessor httpContextAccessor)
     {
         _translationService = translationService;
+        _contentTranslationService = contentTranslationService;
         _httpContextAccessor = httpContextAccessor;
     }
 
@@ -88,5 +90,46 @@ public class TranslationHelper
         }
 
         return await _translationService.GetAsync(key, languageCode);
+    }
+
+    /// <summary>
+    /// Get or trigger translation for content (Thread, Forum, Message)
+    /// Returns the translated text if available, otherwise returns original and triggers translation
+    /// </summary>
+    public async Task<string> TranslateContentAsync(string contentType, string contentId, string fieldName, string sourceText, CancellationToken ct = default)
+    {
+        var language = GetCurrentLanguage();
+
+        // If English, return source text immediately
+        if (string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+            return sourceText;
+
+        try
+        {
+            // Check if translation exists
+            var existing = await _contentTranslationService.GetTranslationAsync(contentType, contentId, fieldName, language, ct);
+            if (!string.IsNullOrWhiteSpace(existing))
+                return existing;
+
+            // Trigger translation in background (SignalR will notify when complete)
+            _ = _contentTranslationService.TranslateContentAsync(contentType, contentId, fieldName, sourceText, language, ct);
+
+            // Return source text while translation is in progress
+            return sourceText;
+        }
+        catch
+        {
+            // Best effort - return source text on any error
+            return sourceText;
+        }
+    }
+
+    /// <summary>
+    /// Check if content needs translation for current language
+    /// </summary>
+    public bool NeedsTranslation()
+    {
+        var language = GetCurrentLanguage();
+        return !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase);
     }
 }

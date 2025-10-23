@@ -16,5 +16,15 @@ public class ForumHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(threadId));
     }
 
+    public async Task JoinHome()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "home");
+    }
+
+    public async Task LeaveHome()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "home");
+    }
+
     public static string GroupName(string threadId) => $"thread:{threadId}";
 }

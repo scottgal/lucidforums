@@ -1,0 +1,164 @@
+@{
+    ViewData["Title"] = "Site Setup - Generate Sample Content";
+    Layout = "_Layout";
+}
+
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl w-full space-y-8">
+        <div class="text-center">
+            <i class='bx bx-rocket text-6xl text-primary'></i>
+            <h2 class="mt-6 text-3xl font-extrabold">
+                One-Click Site Setup
+            </h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                Populate your forum with sample forums, users, and content
+            </p>
+        </div>
+
+        @if (TempData["AdminCreated"] != null)
+        {
+            <div class="alert alert-success">
+                <i class='bx bx-check-circle'></i>
+                <span>@TempData["AdminCreated"]</span>
+            </div>
+        }
+
+        @if (TempData["SetupError"] != null)
+        {
+            <div class="alert alert-error">
+                <i class='bx bx-error-circle'></i>
+                <span>@TempData["SetupError"]</span>
+            </div>
+        }
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class='bx bx-magic-wand'></i>
+                    Generate Sample Site
+                </h3>
+                <p class="text-sm text-base-content/70 mb-4">
+                    This will automatically create forums, users, threads, and messages to give you a fully populated site to explore.
+                </p>
+
+                <form method="post" action="/initial-setup/generate-site" class="space-y-4" id="generateForm">
+                    @Html.AntiForgeryToken()
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold flex items-center gap-2">
+                                    <i class='bx bx-category'></i>
+                                    <span>Forums</span>
+                                </span>
+                            </label>
+                            <input type="number" name="forumCount" value="12" min="1" max="20" class="input input-bordered" />
+                            <label class="label">
+                                <span class="label-text-alt">Number of forums to create</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold flex items-center gap-2">
+                                    <i class='bx bx-user-plus'></i>
+                                    <span>Users per Forum</span>
+                                </span>
+                            </label>
+                            <input type="number" name="usersPerForum" value="5" min="1" max="10" class="input input-bordered" />
+                            <label class="label">
+                                <span class="label-text-alt">Active users per forum</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold flex items-center gap-2">
+                                    <i class='bx bx-conversation'></i>
+                                    <span>Threads per Forum</span>
+                                </span>
+                            </label>
+                            <input type="number" name="threadsPerForum" value="10" min="1" max="20" class="input input-bordered" />
+                            <label class="label">
+                                <span class="label-text-alt">Discussion threads per forum</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold flex items-center gap-2">
+                                    <i class='bx bx-message-rounded-dots'></i>
+                                    <span>Replies per Thread</span>
+                                </span>
+                            </label>
+                            <input type="number" name="repliesPerThread" value="5" min="0" max="10" class="input input-bordered" />
+                            <label class="label">
+                                <span class="label-text-alt">Replies per thread</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class='bx bx-info-circle'></i>
+                        <div class="text-sm">
+                            <p class="font-semibold">This will create approximately:</p>
+                            <ul class="list-disc list-inside mt-2 space-y-1">
+                                <li><span id="estimateForums">12</span> forums with diverse topics</li>
+                                <li><span id="estimateUsers">60</span> user accounts (password: Password123!)</li>
+                                <li><span id="estimateThreads">120</span> discussion threads</li>
+                                <li><span id="estimateMessages">600</span> messages and replies</li>
+                            </ul>
+                            <p class="mt-2 text-xs">Generation may take 2-5 minutes depending on AI response times.</p>
+                        </div>
+                    </div>
+
+                    <div class="card-actions justify-between pt-4">
+                        <button type="submit" formaction="/initial-setup/skip-site-setup" class="btn btn-ghost">
+                            <i class='bx bx-skip-next'></i>
+                            <span>Skip & Start Empty</span>
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="generateBtn">
+                            <i class='bx bx-rocket'></i>
+                            <span>Generate Site Content</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center text-sm text-base-content/60">
+            <p>You can always create your own content manually or generate more later.</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Update estimates when inputs change
+    const inputs = document.querySelectorAll('#generateForm input[type="number"]');
+    const updateEstimates = () => {
+        const forums = parseInt(document.querySelector('[name="forumCount"]').value) || 0;
+        const usersPerForum = parseInt(document.querySelector('[name="usersPerForum"]').value) || 0;
+        const threadsPerForum = parseInt(document.querySelector('[name="threadsPerForum"]').value) || 0;
+        const repliesPerThread = parseInt(document.querySelector('[name="repliesPerThread"]').value) || 0;
+
+        document.getElementById('estimateForums').textContent = forums;
+        document.getElementById('estimateUsers').textContent = forums * usersPerForum;
+        document.getElementById('estimateThreads').textContent = forums * threadsPerForum;
+        document.getElementById('estimateMessages').textContent = forums * threadsPerForum * repliesPerThread;
+    };
+
+    inputs.forEach(input => input.addEventListener('input', updateEstimates));
+
+    // Show loading state on submit
+    const form = document.getElementById('generateForm');
+    const generateBtn = document.getElementById('generateBtn');
+
+    form.addEventListener('submit', (e) => {
+        if (e.submitter === generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="loading loading-spinner"></span> Generating...';
+        }
+    });
+</script>
+}

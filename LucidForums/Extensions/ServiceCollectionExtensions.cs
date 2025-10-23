@@ -211,8 +211,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Services.Translation.IContentTranslationQueue>(sp => sp.GetRequiredService<Services.Translation.ContentTranslationQueue>());
         services.AddHostedService<Services.Translation.ContentTranslationHostedService>();
 
-        // Setup service for first-run configuration
+        // Setup services for first-run configuration and site generation
         services.AddScoped<Services.Setup.ISetupService, Services.Setup.SetupService>();
+        services.AddScoped<Services.Setup.ISiteSetupService, Services.Setup.SiteSetupService>();
 
         return services;
     }
@@ -238,7 +239,7 @@ public static class ServiceCollectionExtensions
 
         // App-level ActivitySource/Meter for custom spans/metrics
         services.AddSingleton<ITelemetry, Telemetry>();
-
+        
         services.AddOpenTelemetry()
             .ConfigureResource(rb => rb.AddService(serviceName, serviceVersion: serviceVersion))
             .WithTracing(tp => tp

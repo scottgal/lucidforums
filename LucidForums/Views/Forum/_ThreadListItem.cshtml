@@ -1,8 +1,9 @@
 ﻿@model LucidForums.Models.ViewModels.ThreadSummaryVm
+@inject LucidForums.Helpers.TranslationHelper translator
 <li id="thread-@Model.Id" class="py-3" data-thread-id="@Model.Id">
     <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-            <a class="text-base-content hover:link font-medium thread-title" data-thread-id="@Model.Id" href="@Url.Action("Show", "Threads", new { id = Model.Id })" auto-translate="true" translation-category="thread.title" translation-field="Title">@Model.Title</a>
+            <a class="text-base-content hover:link font-medium thread-title" data-thread-id="@Model.Id" href="@Url.Action("Show", "Threads", new { id = Model.Id })">@(await translator.TranslateContentAsync("Thread", Model.Id.ToString(), "Title", Model.Title))</a>
             <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-70">
                 <span>@Model.CreatedAtUtc.ToLocalTime().ToString("g")</span>
                 <span>•</span>

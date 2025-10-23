@@ -1,5 +1,7 @@
 ﻿using LucidForums.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using LucidForums.Hubs;
 
 namespace LucidForums.Services.Forum;
 
@@ -11,7 +13,7 @@ public interface IThreadService
     Task<List<ForumThread>> ListLatestAsync(int skip = 0, int take = 10, CancellationToken ct = default);
 }
 
-public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor) : IThreadService
+public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums.Services.Analysis.ICharterScoringService charterScoring, LucidForums.Services.Search.IEmbeddingService embeddingService, LucidForums.Services.Analysis.ITagExtractionService tagExtractor, IHubContext<ForumHub> forumHub, ILogger<ThreadService> logger) : IThreadService
 {
     public Task<ForumThread?> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -105,6 +107,27 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
         {
             try { await embeddingService.IndexMessageAsync(thread.RootMessageId!.Value, CancellationToken.None); }
             catch { /* swallow */ }
+        });
+
+        // Broadcast new thread to home page listeners
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await forumHub.Clients.Group("home").SendAsync("NewThread", new
+                {
+                    threadId = thread.Id,
+                    forumId = thread.ForumId,
+                    title = thread.Title,
+                    createdAt = thread.CreatedAtUtc,
+                    authorId = thread.CreatedById,
+                    charterScore = thread.CharterScore
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to broadcast new thread via SignalR");
+            }
         });
 
         return thread;

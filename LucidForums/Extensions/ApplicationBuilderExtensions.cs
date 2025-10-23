@@ -51,6 +51,7 @@ public static class ApplicationBuilderExtensions
         app.MapHub<LucidForums.Hubs.ForumHub>(LucidForums.Hubs.ForumHub.HubPath);
         app.MapHub<LucidForums.Hubs.SeedingHub>(LucidForums.Hubs.SeedingHub.HubPath);
         app.MapHub<LucidForums.Hubs.TranslationHub>(LucidForums.Hubs.TranslationHub.HubPath);
+        app.MapHub<LucidForums.Hubs.SetupHub>(LucidForums.Hubs.SetupHub.HubPath);
 
         return app;
     }
@@ -99,16 +100,15 @@ public static class ApplicationBuilderExtensions
             Log.Logger.Warning(ex, "Could not ensure database exists - it may already exist or permissions may be insufficient");
         }
 
-        // Now run migrations on the actual database
+        // Create schema from the current model (no migrations)
         try
         {
-            await db.Database.MigrateAsync();
+            await db.Database.EnsureCreatedAsync();
         }
         catch (Exception ex)
         {
-            // If migrations fail, try EnsureCreated as fallback
-            Log.Logger.Warning(ex, "Migration failed, attempting EnsureCreated");
-            await db.Database.EnsureCreatedAsync();
+            Log.Logger.Error(ex, "EnsureCreated failed");
+            throw;
         }
         try
         {
@@ -176,7 +176,7 @@ public static class ApplicationBuilderExtensions
             // Ignore when not PostgreSQL or extension unavailable
         }
 
-        // Ensure charter score columns exist (PostgreSQL only; safe no-op otherwise)
+        // Ensure charter score columns and SourceLanguage columns exist (PostgreSQL only; safe no-op otherwise)
         try
         {
             await db.Database.ExecuteSqlRawAsync(@"DO $$ BEGIN
@@ -184,10 +184,21 @@ public static class ApplicationBuilderExtensions
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Threads' AND column_name='CharterScore') THEN
                     EXECUTE 'ALTER TABLE ""Threads"" ADD COLUMN ""CharterScore"" double precision NULL';
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Threads' AND column_name='SourceLanguage') THEN
+                    EXECUTE 'ALTER TABLE ""Threads"" ADD COLUMN ""SourceLanguage"" text NOT NULL DEFAULT ''en''';
+                END IF;
             END IF;
             IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Messages') THEN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Messages' AND column_name='CharterScore') THEN
                     EXECUTE 'ALTER TABLE ""Messages"" ADD COLUMN ""CharterScore"" double precision NULL';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Messages' AND column_name='SourceLanguage') THEN
+                    EXECUTE 'ALTER TABLE ""Messages"" ADD COLUMN ""SourceLanguage"" text NOT NULL DEFAULT ''en''';
+                END IF;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Forums') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Forums' AND column_name='SourceLanguage') THEN
+                    EXECUTE 'ALTER TABLE ""Forums"" ADD COLUMN ""SourceLanguage"" text NOT NULL DEFAULT ''en''';
                 END IF;
             END IF;
         EXCEPTION WHEN OTHERS THEN

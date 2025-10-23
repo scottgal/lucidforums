@@ -1,0 +1,106 @@
+@model LucidForums.Models.ViewModels.SetupAdminRequest
+@{
+    ViewData["Title"] = "Initial Setup - Create Administrator";
+    Layout = "_Layout";
+}
+
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div class="text-center">
+            <i class='bx bx-shield-alt-2 text-6xl text-primary'></i>
+            <h2 class="mt-6 text-3xl font-extrabold">
+                Welcome to LucidForums
+            </h2>
+            <p class="mt-2 text-sm text-base-content/70">
+                Let's set up your administrator account to get started
+            </p>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <form method="post" action="/initial-setup/create-admin" class="space-y-6">
+                    @Html.AntiForgeryToken()
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-error">
+                            <i class='bx bx-error-circle'></i>
+                            <div>
+                                <div asp-validation-summary="All" class="text-sm"></div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="form-control">
+                        <label class="label" asp-for="Email">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-envelope'></i>
+                                <span>Email Address</span>
+                            </span>
+                        </label>
+                        <input asp-for="Email" type="email" class="input input-bordered w-full" placeholder="admin@example.com" required autofocus />
+                        <span asp-validation-for="Email" class="label-text-alt text-error"></span>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" asp-for="Username">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-user'></i>
+                                <span>Username</span>
+                            </span>
+                        </label>
+                        <input asp-for="Username" type="text" class="input input-bordered w-full" placeholder="admin" required />
+                        <span asp-validation-for="Username" class="label-text-alt text-error"></span>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" asp-for="Password">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-lock-alt'></i>
+                                <span>Password</span>
+                            </span>
+                        </label>
+                        <input asp-for="Password" type="password" class="input input-bordered w-full" placeholder="••••••••" required />
+                        <label class="label">
+                            <span class="label-text-alt">Minimum 8 characters</span>
+                        </label>
+                        <span asp-validation-for="Password" class="label-text-alt text-error"></span>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label" asp-for="ConfirmPassword">
+                            <span class="label-text font-semibold flex items-center gap-2">
+                                <i class='bx bx-lock-alt'></i>
+                                <span>Confirm Password</span>
+                            </span>
+                        </label>
+                        <input asp-for="ConfirmPassword" type="password" class="input input-bordered w-full" placeholder="••••••••" required />
+                        <span asp-validation-for="ConfirmPassword" class="label-text-alt text-error"></span>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class='bx bx-info-circle'></i>
+                        <span class="text-sm">
+                            This account will have full administrator privileges to manage your LucidForums installation.
+                        </span>
+                    </div>
+
+                    <div class="form-control mt-6">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class='bx bx-check-circle'></i>
+                            <span>Create Administrator Account</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center text-sm text-base-content/60">
+            <p>Once setup is complete, you'll be able to log in and configure your forums.</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

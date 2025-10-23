@@ -34,9 +34,10 @@ else
 
 var app = builder.Build();
 
-app
+app = app
     .UseLucidForumsPipeline()
-    .MapLucidForumsEndpoints()
-    .InitializeLucidForumsDatabase();
+    .MapLucidForumsEndpoints();
+
+await app.InitializeLucidForumsDatabase();
 
 app.Run();
