@@ -400,4 +400,68 @@ Text to translate:
             TranslatedText: s.Translations.FirstOrDefault()?.TranslatedText
         )).ToList();
     }
+
+    public async Task<string> DetectLanguageAsync(string text, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "en"; // Default to English for empty text
+        }
+
+        // Cache language detection to avoid repeated calls
+        var detectCacheKey = $"lang-detect:{ContentHash.Generate(text, 8)}";
+        var detected = await _cache.GetOrCreateAsync(detectCacheKey, async entry =>
+        {
+            entry.SlidingExpiration = TimeSpan.FromDays(7);
+
+            var detector = new Charter
+            {
+                Name = "LanguageDetector",
+                Purpose = "Detect the human language of the provided text and respond with ONLY the two-letter ISO 639-1 language code (e.g., 'en', 'es', 'fr', 'de', 'ja', 'zh')."
+            };
+
+            var detectPrompt = $@"Detect the language of the following text and return ONLY the two-letter ISO 639-1 language code.
+Do not include any punctuation, explanation, or extra text - just the two-letter code in lowercase.
+
+Examples:
+- For English text, return: en
+- For Spanish text, return: es
+- For French text, return: fr
+- For German text, return: de
+- For Japanese text, return: ja
+- For Chinese text, return: zh
+
+Text to detect:
+{text}";
+
+            var result = await _ai.GenerateAsync(detector, detectPrompt, ct: ct);
+            var cleaned = (result ?? "en").Trim().ToLowerInvariant();
+
+            // Extract just the language code if AI returned more than expected
+            if (cleaned.Length > 2)
+            {
+                // Try to extract a 2-letter code
+                var match = System.Text.RegularExpressions.Regex.Match(cleaned, @"\b([a-z]{2})\b");
+                if (match.Success)
+                {
+                    cleaned = match.Groups[1].Value;
+                }
+                else
+                {
+                    cleaned = cleaned.Substring(0, Math.Min(2, cleaned.Length));
+                }
+            }
+
+            // Validate it's a valid 2-letter code
+            if (cleaned.Length != 2 || !cleaned.All(char.IsLetter))
+            {
+                _logger.LogWarning("Language detection returned invalid code '{Code}', defaulting to 'en'", cleaned);
+                return "en";
+            }
+
+            return cleaned;
+        });
+
+        return detected ?? "en";
+    }
 }

@@ -6,7 +6,7 @@ namespace LucidForums.Services.Forum;
 public interface IThreadService
 {
     Task<ForumThread?> GetAsync(Guid id, CancellationToken ct = default);
-    Task<ForumThread> CreateAsync(Guid forumId, string title, string content, string? authorId, CancellationToken ct = default);
+    Task<ForumThread> CreateAsync(Guid forumId, string title, string content, string? authorId, string sourceLanguage = "en", CancellationToken ct = default);
     Task<List<ForumThread>> ListByForumAsync(Guid forumId, int skip = 0, int take = 50, CancellationToken ct = default);
     Task<List<ForumThread>> ListLatestAsync(int skip = 0, int take = 10, CancellationToken ct = default);
 }
@@ -21,7 +21,7 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
             .FirstOrDefaultAsync(t => t.Id == id, ct);
     }
 
-    public async Task<ForumThread> CreateAsync(Guid forumId, string title, string content, string? authorId, CancellationToken ct = default)
+    public async Task<ForumThread> CreateAsync(Guid forumId, string title, string content, string? authorId, string sourceLanguage = "en", CancellationToken ct = default)
     {
         // Validate author exists; otherwise use null to avoid FK violations
         string? validAuthorId = null;
@@ -40,6 +40,7 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
             ForumId = forumId,
             Title = title,
             CreatedById = validAuthorId,
+            SourceLanguage = sourceLanguage,
             CreatedAtUtc = DateTime.UtcNow
         };
         var root = new Message
@@ -47,6 +48,7 @@ public class ThreadService(LucidForums.Data.ApplicationDbContext db, LucidForums
             Thread = thread,
             Content = content,
             CreatedById = validAuthorId,
+            SourceLanguage = sourceLanguage,
             CreatedAtUtc = DateTime.UtcNow,
             Path = null,
         };

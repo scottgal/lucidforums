@@ -1,6 +1,10 @@
 ﻿@model LucidForums.Models.ViewModels.ReplyVm
-<div class="card bg-base-200 mt-4">
-    <div class="card-body py-3">
+<div class="card bg-base-100 mt-4 border border-base-300">
+    <div class="card-body py-4">
+        <div class="flex items-center gap-2 mb-3">
+            <i class='bx bx-reply text-lg text-primary'></i>
+            <span class="font-semibold" auto-translate="true" translation-category="thread">Post a Reply</span>
+        </div>
         <form method="post"
               hx-post="@Url.Action("Reply", "Threads", new { id = Model.ThreadId })"
               hx-target="#messages ul"
@@ -9,15 +13,26 @@
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="ThreadId" />
             <input type="hidden" asp-for="ParentId" />
-            <div class="form-control mb-2">
-                <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="3" placeholder="Write a reply..."></textarea>
-                <label class="label">
-                    <span asp-validation-for="Content" class="label-text-alt text-error"></span>
-                </label>
+            <div class="space-y-3">
+                <div class="form-control">
+                    <textarea asp-for="Content" class="textarea textarea-bordered w-full focus:textarea-primary" rows="4" placeholder="Share your thoughts..."></textarea>
+                    <label class="label">
+                        <span asp-validation-for="Content" class="label-text-alt text-error"></span>
+                    </label>
+                </div>
+
+                @await Html.PartialAsync("_LanguageSelector", "SourceLanguage")
             </div>
-            <div class="flex justify-end gap-2">
-                <button type="button" class="btn btn-sm btn-ghost" onclick="this.closest('.card').remove()" auto-translate="true" translation-category="thread">Cancel</button>
-                <button type="submit" class="btn btn-sm btn-primary" auto-translate="true" translation-category="thread">Post Reply</button>
+
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="this.closest('.card').remove()">
+                    <i class='bx bx-x'></i>
+                    <span auto-translate="true" translation-category="thread">Cancel</span>
+                </button>
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class='bx bx-send'></i>
+                    <span auto-translate="true" translation-category="thread">Post Reply</span>
+                </button>
             </div>
         </form>
     </div>

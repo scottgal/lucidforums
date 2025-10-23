@@ -3,27 +3,108 @@
     ViewData["Title"] = "Create Forum";
 }
 @inject LucidForums.Helpers.TranslationHelper T
-<h1 class="text-2xl font-bold mb-4" auto-translate="true" translation-category="forum.create">Create Forum</h1>
-<form method="post" action="/Forum/Create" class="space-y-4 max-w-xl">
-    @Html.AntiForgeryToken()
-    <div asp-validation-summary="All" class="text-red-600"></div>
-    <div>
-        <label class="block text-sm font-medium" auto-translate="true" translation-category="forum.create">Name</label>
-        <input asp-for="Name" class="input input-bordered w-full" />
-        <span asp-validation-for="Name" class="text-red-600 text-sm"></span>
+
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold flex items-center gap-3">
+            <i class='bx bx-conversation text-primary'></i>
+            <span auto-translate="true" translation-category="forum.create">Create Forum</span>
+        </h1>
+        <p class="text-base-content/70 mt-2" auto-translate="true" translation-category="forum.create">
+            Create a new discussion space with its own rules and community
+        </p>
     </div>
-    <div>
-        <label class="block text-sm font-medium" auto-translate="true" translation-category="forum.create">Description</label>
-        <input asp-for="Description" class="input input-bordered w-full" />
-        <span asp-validation-for="Description" class="text-red-600 text-sm"></span>
+
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <form method="post" action="/Forum/Create" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
+
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-tag'></i>
+                            <span auto-translate="true" translation-category="forum.create">Forum Name</span>
+                        </span>
+                    </label>
+                    <input asp-for="Name" class="input input-bordered w-full" placeholder='@(await T.T("forum.create.name-placeholder", "e.g., Technology Discussion"))' />
+                    <label class="label">
+                        <span asp-validation-for="Name" class="label-text-alt text-error"></span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-text'></i>
+                            <span auto-translate="true" translation-category="forum.create">Description</span>
+                        </span>
+                    </label>
+                    <textarea asp-for="Description" class="textarea textarea-bordered w-full" rows="3" placeholder='@(await T.T("forum.create.description-placeholder", "Describe what this forum is about..."))'></textarea>
+                    <label class="label">
+                        <span asp-validation-for="Description" class="label-text-alt text-error"></span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-link'></i>
+                            <span auto-translate="true" translation-category="forum.create">URL Slug</span>
+                            <span class="badge badge-sm" auto-translate="true" translation-category="form">Optional</span>
+                        </span>
+                    </label>
+                    <input asp-for="Slug" class="input input-bordered w-full font-mono text-sm" placeholder='@(await T.T("forum.create.slug-placeholder", "auto-generated if left blank"))' />
+                    <label class="label">
+                        <span asp-validation-for="Slug" class="label-text-alt text-error"></span>
+                        <span class="label-text-alt text-base-content/60" auto-translate="true" translation-category="forum.create">
+                            lowercase letters, numbers, and hyphens only
+                        </span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-file-blank'></i>
+                            <span auto-translate="true" translation-category="forum.create">Community Charter</span>
+                            <span class="badge badge-sm" auto-translate="true" translation-category="form">Optional</span>
+                        </span>
+                    </label>
+                    <select asp-for="CharterId" class="select select-bordered w-full">
+                        <option value="">
+                            <span auto-translate="true" translation-category="forum.create">No charter - open discussion</span>
+                        </option>
+                        @if (ViewBag.Charters != null)
+                        {
+                            @foreach (var charter in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.Charters)
+                            {
+                                <option value="@charter.Value">@charter.Text</option>
+                            }
+                        }
+                    </select>
+                    <label class="label">
+                        <span asp-validation-for="CharterId" class="label-text-alt text-error"></span>
+                        <span class="label-text-alt text-base-content/60" auto-translate="true" translation-category="forum.create">
+                            Charters help guide community behavior and AI moderation
+                        </span>
+                    </label>
+                </div>
+
+                @await Html.PartialAsync("_LanguageSelector", "SourceLanguage")
+
+                <div class="card-actions justify-end pt-4">
+                    <a class="btn btn-ghost" href="@Url.Action("Index", "Forum")">
+                        <i class='bx bx-x'></i>
+                        <span auto-translate="true" translation-category="forum.create">Cancel</span>
+                    </a>
+                    <button class="btn btn-primary" type="submit">
+                        <i class='bx bx-plus'></i>
+                        <span auto-translate="true" translation-category="forum.create">Create Forum</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
-    <div>
-        <label class="block text-sm font-medium" auto-translate="true" translation-category="forum.create">Slug (optional)</label>
-        <input asp-for="Slug" class="input input-bordered w-full" placeholder='@(await T.T("forum.create.slug-placeholder", "auto-generated if left blank"))' />
-        <span asp-validation-for="Slug" class="text-red-600 text-sm"></span>
-    </div>
-    <div class="flex gap-2">
-        <button class="btn btn-primary" type="submit" auto-translate="true" translation-category="forum.create">Create</button>
-        <a class="btn" href="@Url.Action("Index", "Forum")" auto-translate="true" translation-category="forum.create">Cancel</a>
-    </div>
-</form>
+</div>

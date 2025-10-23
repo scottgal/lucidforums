@@ -1,0 +1,53 @@
+@model string
+@*
+    Usage: @await Html.PartialAsync("_LanguageSelector", "SourceLanguage")
+    Pass the property name as the model
+*@
+@inject LucidForums.Helpers.TranslationHelper T
+@{
+    var fieldName = Model ?? "SourceLanguage";
+    var inputId = $"input-{fieldName.ToLowerInvariant()}";
+}
+
+<div class="form-control">
+    <label class="label" for="@inputId">
+        <span class="label-text font-semibold flex items-center gap-2">
+            <i class='bx bx-world text-lg'></i>
+            <span auto-translate="true" translation-category="form">Source Language</span>
+        </span>
+    </label>
+    <select id="@inputId" name="@fieldName" class="select select-bordered w-full">
+        <option value="auto" selected>
+            <span auto-translate="true" translation-category="form.language">🤖 Auto-detect</span>
+        </option>
+        <optgroup label="Common Languages">
+            <option value="en">🇬🇧 English</option>
+            <option value="es">🇪🇸 Spanish</option>
+            <option value="fr">🇫🇷 French</option>
+            <option value="de">🇩🇪 German</option>
+            <option value="it">🇮🇹 Italian</option>
+            <option value="pt">🇵🇹 Portuguese</option>
+            <option value="zh">🇨🇳 Chinese</option>
+            <option value="ja">🇯🇵 Japanese</option>
+            <option value="ko">🇰🇷 Korean</option>
+        </optgroup>
+        <optgroup label="Other Languages">
+            <option value="ru">🇷🇺 Russian</option>
+            <option value="ar">🇸🇦 Arabic</option>yes
+            <option value="hi">🇮🇳 Hindi</option>
+            <option value="nl">🇳🇱 Dutch</option>
+            <option value="pl">🇵🇱 Polish</option>
+            <option value="tr">🇹🇷 Turkish</option>
+            <option value="sv">🇸🇪 Swedish</option>
+            <option value="da">🇩🇰 Danish</option>
+            <option value="no">🇳🇴 Norwegian</option>
+            <option value="fi">🇫🇮 Finnish</option>
+        </optgroup>
+    </select>
+    <label class="label">
+        <span class="label-text-alt text-base-content/60 flex items-center gap-1">
+            <i class='bx bx-info-circle'></i>
+            <span auto-translate="true" translation-category="form">Select the language of your content, or use Auto-detect</span>
+        </span>
+    </label>
+</div>

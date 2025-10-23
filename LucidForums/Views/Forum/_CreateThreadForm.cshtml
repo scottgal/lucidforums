@@ -1,35 +1,56 @@
 ﻿@model LucidForums.Models.ViewModels.CreateThreadVm
 @inject LucidForums.Helpers.TranslationHelper T
-<div class="card bg-base-100 shadow-md">
+<div class="card bg-base-100 shadow-lg border border-primary/20">
     <div class="card-body">
-        <h3 class="card-title" auto-translate="true" translation-category="forum.create-thread">Create New Thread</h3>
+        <h3 class="card-title text-xl flex items-center gap-2">
+            <i class='bx bx-message-square-add text-primary'></i>
+            <span auto-translate="true" translation-category="forum.create-thread">Create New Thread</span>
+        </h3>
         <form method="post"
               hx-post="@Url.Action("CreateThread", "Forum", new { forumId = Model.ForumId })"
               hx-target="#thread-list"
               hx-swap="afterbegin"
               hx-on::after-request="if(event.detail.successful) this.closest('.card').remove()">
             @Html.AntiForgeryToken()
-            <div class="form-control mb-4">
-                <label class="label">
-                    <span class="label-text font-semibold" auto-translate="true" translation-category="forum.create-thread">Title</span>
-                </label>
-                <input asp-for="Title" class="input input-bordered w-full" placeholder='@(await T.T("forum.create-thread.title-placeholder", "Enter thread title..."))' />
-                <label class="label">
-                    <span asp-validation-for="Title" class="label-text-alt text-error"></span>
-                </label>
+            <div class="space-y-4 mt-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-heading'></i>
+                            <span auto-translate="true" translation-category="forum.create-thread">Thread Title</span>
+                        </span>
+                    </label>
+                    <input asp-for="Title" class="input input-bordered w-full" placeholder='@(await T.T("forum.create-thread.title-placeholder", "What would you like to discuss?"))' />
+                    <label class="label">
+                        <span asp-validation-for="Title" class="label-text-alt text-error"></span>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-semibold flex items-center gap-2">
+                            <i class='bx bx-message-detail'></i>
+                            <span auto-translate="true" translation-category="forum.create-thread">Content</span>
+                        </span>
+                    </label>
+                    <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="6" placeholder='@(await T.T("forum.create-thread.content-placeholder", "Share your thoughts..."))'></textarea>
+                    <label class="label">
+                        <span asp-validation-for="Content" class="label-text-alt text-error"></span>
+                    </label>
+                </div>
+
+                @await Html.PartialAsync("_LanguageSelector", "SourceLanguage")
             </div>
-            <div class="form-control mb-4">
-                <label class="label">
-                    <span class="label-text font-semibold" auto-translate="true" translation-category="forum.create-thread">Content</span>
-                </label>
-                <textarea asp-for="Content" class="textarea textarea-bordered w-full" rows="5" placeholder='@(await T.T("forum.create-thread.content-placeholder", "What's on your mind?"))'></textarea>
-                <label class="label">
-                    <span asp-validation-for="Content" class="label-text-alt text-error"></span>
-                </label>
-            </div>
-            <div class="card-actions justify-end">
-                <button type="button" class="btn btn-ghost" onclick="this.closest('.card').remove()" auto-translate="true" translation-category="forum.create-thread">Cancel</button>
-                <button type="submit" class="btn btn-primary" auto-translate="true" translation-category="forum.create-thread">Create Thread</button>
+
+            <div class="card-actions justify-end mt-6">
+                <button type="button" class="btn btn-ghost" onclick="this.closest('.card').remove()">
+                    <i class='bx bx-x'></i>
+                    <span auto-translate="true" translation-category="forum.create-thread">Cancel</span>
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class='bx bx-send'></i>
+                    <span auto-translate="true" translation-category="forum.create-thread">Create Thread</span>
+                </button>
             </div>
         </form>
     </div>

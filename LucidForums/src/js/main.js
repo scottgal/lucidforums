@@ -117,6 +117,9 @@ async function initTranslationHub() {
         st.id = styleId;
         st.textContent = `
             .lf-translation-updating { outline: 2px solid var(--fallback-p, #60a5fa); outline-offset: 2px; transition: outline-color .2s, opacity .2s; }
+            .lf-translation-pending { outline: 2px dashed #94a3b8; outline-offset: 3px; border-radius: 4px; animation: lfPulse 1.2s ease-in-out infinite alternate; }
+            .lf-translation-done { outline: 2px solid #60d394; outline-offset: 3px; border-radius: 4px; }
+            @keyframes lfPulse { from { opacity: .9 } to { opacity: 1 } }
             .lf-translation-progress { position: fixed; right: 12px; bottom: 12px; z-index: 2147483646; background: rgba(0,0,0,.75); color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.3); max-width: 60vw; }
             .lf-translation-progress .bar { height: 4px; background: rgba(255,255,255,.2); border-radius: 999px; overflow: hidden; margin-top: 6px; }
             .lf-translation-progress .bar > span { display: block; height: 100%; background: #60d394; width: 0%; transition: width .2s ease; }
@@ -195,6 +198,41 @@ async function initTranslationHub() {
         });
 
         // Listen for content translation updates (user-generated content like messages, threads, forums)
+        // Show a subtle frame on content queued for translation
+        connection.on('ContentTranslationQueued', (data) => {
+            const { contentType, contentId, fieldName, language } = data || {};
+            const currentLanguage = getCookie('preferred-language') || 'en';
+            if (!language || language !== currentLanguage) return;
+
+            const addPending = (el) => { if (el) el.classList.add('lf-translation-pending'); };
+
+            if (contentType === 'Message' && fieldName === 'Content') {
+                const messageElements = document.querySelectorAll(`[data-message-id="${contentId}"]`);
+                messageElements.forEach((messageElement) => {
+                    const contentElement = messageElement.querySelector('.message-content');
+                    addPending(contentElement || messageElement);
+                });
+                return;
+            }
+            if (contentType === 'Thread' && fieldName === 'Title') {
+                const nodes = document.querySelectorAll(`[data-thread-id="${contentId}"] .thread-title, .thread-title[data-thread-id="${contentId}"]`);
+                nodes.forEach(addPending);
+                return;
+            }
+            if (contentType === 'Forum') {
+                if (fieldName === 'Name') {
+                    const nameNodes = document.querySelectorAll(`[data-forum-id="${contentId}"] .forum-name, .forum-name[data-forum-id="${contentId}"]`);
+                    nameNodes.forEach(addPending);
+                    return;
+                }
+                if (fieldName === 'Description') {
+                    const descNodes = document.querySelectorAll(`[data-forum-id="${contentId}"] .forum-description, .forum-description[data-forum-id="${contentId}"]`);
+                    descNodes.forEach(addPending);
+                    return;
+                }
+            }
+        });
+
         connection.on('ContentTranslated', (data) => {
             const { contentType, contentId, fieldName, language, translatedText } = data;
 
@@ -206,13 +244,19 @@ async function initTranslationHub() {
                 return;
             }
 
-            // Helper to add a brief highlight/fade animation
+            // Helper to add a brief highlight/fade animation, clear pending, and briefly show success frame
             function animateSwap(el) {
                 if (!el) return;
+                el.classList.remove('lf-translation-pending');
                 el.classList.add('lf-translation-updating');
                 el.style.transition = 'opacity 0.2s';
                 el.style.opacity = '0.85';
-                setTimeout(() => { el.style.opacity = '1'; el.classList.remove('lf-translation-updating'); }, 200);
+                setTimeout(() => {
+                    el.style.opacity = '1';
+                    el.classList.remove('lf-translation-updating');
+                    el.classList.add('lf-translation-done');
+                    setTimeout(() => el.classList.remove('lf-translation-done'), 1200);
+                }, 200);
             }
 
             // For messages, look for message container with data-message-id
@@ -222,7 +266,7 @@ async function initTranslationHub() {
                     const contentElement = messageElement.querySelector('.message-content');
                     if (contentElement) {
                         // Encode HTML and replace newlines with <br/> to match the server rendering
-                        const encodedText = translatedText
+                        const encodedText = (translatedText || '')
                             .replace(/&/g, '&amp;')
                             .replace(/</g, '&lt;')
                             .replace(/>/g, '&gt;')
@@ -231,6 +275,8 @@ async function initTranslationHub() {
                             .replace(/\n/g, '<br/>');
                         contentElement.innerHTML = encodedText;
                         animateSwap(contentElement);
+                    } else {
+                        animateSwap(messageElement);
                     }
                 });
                 return;

@@ -14,6 +14,7 @@ public class ThreadsController(
     IThreadViewService threadViewService,
     IMessageService messageService,
     IContentTranslationService contentTranslationService,
+    ITranslationService translationService,
     TranslationHelper translationHelper,
     LucidForums.Web.Mapping.IAppMapper mapper,
     IHubContext<ForumHub> hubContext,
@@ -107,7 +108,7 @@ public class ThreadsController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Route("Threads/{id:guid}/Reply")] 
+    [Route("Threads/{id:guid}/Reply")]
     public async Task<IActionResult> Reply(Guid id, ReplyVm vm, CancellationToken ct)
     {
         if (!ModelState.IsValid)
@@ -115,7 +116,15 @@ public class ThreadsController(
             Response.StatusCode = 400;
             return PartialView("_ReplyForm", vm);
         }
-        var msg = await messageService.ReplyAsync(id, vm.ParentId, vm.Content, User?.Identity?.Name, ct);
+
+        // Detect language if "auto" is selected
+        var sourceLanguage = vm.SourceLanguage;
+        if (sourceLanguage == "auto")
+        {
+            sourceLanguage = await translationService.DetectLanguageAsync(vm.Content, ct);
+        }
+
+        var msg = await messageService.ReplyAsync(id, vm.ParentId, vm.Content, User?.Identity?.Name, sourceLanguage, ct);
 
         // Prepare view model with original and translated content for current language
         var language = translationHelper.GetCurrentLanguage();

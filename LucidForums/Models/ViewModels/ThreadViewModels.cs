@@ -23,6 +23,7 @@ public class CreateThreadVm
     public Guid ForumId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string SourceLanguage { get; set; } = "auto";
 }
 
 public class ReplyVm
@@ -30,4 +31,5 @@ public class ReplyVm
     public Guid ThreadId { get; set; }
     public Guid? ParentId { get; set; }
     public string Content { get; set; } = string.Empty;
+    public string SourceLanguage { get; set; } = "auto";
 }

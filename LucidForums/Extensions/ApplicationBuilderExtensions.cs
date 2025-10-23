@@ -1,4 +1,5 @@
 ﻿using LucidForums.Data;
+using LucidForums.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Microsoft.AspNetCore.Identity;
@@ -25,6 +26,10 @@ public static class ApplicationBuilderExtensions
         app.UseRouting();
         app.UseAuthentication();
         app.UseAuthorization();
+
+        // Redirect to initial setup if no admin users exist
+        app.UseSetupRedirect();
+
         app.MapStaticAssets();
         return app;
     }
@@ -191,17 +196,15 @@ public static class ApplicationBuilderExtensions
         }
         catch { }
 
-        // Development-only: create an Administrator role and a dev admin user for local testing
+        // Seed essential roles (User, Moderator, Admin)
         try
         {
-            if (app.Environment.IsDevelopment())
+            var roleManager = scope.ServiceProvider.GetService<RoleManager<IdentityRole>>();
+            if (roleManager is not null)
             {
-                var userManager = scope.ServiceProvider.GetService<UserManager<User>>();
-                var roleManager = scope.ServiceProvider.GetService<RoleManager<IdentityRole>>();
-                if (userManager is not null && roleManager is not null)
+                var requiredRoles = new[] { "User", "Moderator", "Admin" };
+                foreach (var roleName in requiredRoles)
                 {
-                    var roleName = "Administrator";
-                    // Create role if missing
                     var roleExists = roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult();
                     if (!roleExists)
                     {
@@ -210,8 +213,28 @@ public static class ApplicationBuilderExtensions
                         {
                             Log.Logger.Warning("Failed to create role {Role}: {Errors}", roleName, string.Join(',', rres.Errors.Select(e => e.Description)));
                         }
+                        else
+                        {
+                            Log.Logger.Information("Created role: {Role}", roleName);
+                        }
                     }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Don't fail startup if seeding roles fails; just log
+            Log.Logger.Warning(ex, "Failed to seed roles");
+        }
 
+        // Development-only: create a dev admin user for local testing
+        try
+        {
+            if (app.Environment.IsDevelopment())
+            {
+                var userManager = scope.ServiceProvider.GetService<UserManager<User>>();
+                if (userManager is not null)
+                {
                     var adminEmail = "devadmin@localhost";
                     var admin = userManager.FindByEmailAsync(adminEmail).GetAwaiter().GetResult();
                     if (admin is null)
@@ -224,20 +247,24 @@ public static class ApplicationBuilderExtensions
                         }
                         else
                         {
-                            var addRoleRes = userManager.AddToRoleAsync(admin, roleName).GetAwaiter().GetResult();
+                            var addRoleRes = userManager.AddToRoleAsync(admin, "Admin").GetAwaiter().GetResult();
                             if (!addRoleRes.Succeeded)
                             {
                                 Log.Logger.Warning("Failed to add dev admin to role: {Errors}", string.Join(',', addRoleRes.Errors.Select(e => e.Description)));
+                            }
+                            else
+                            {
+                                Log.Logger.Information("Created development admin user: {Email}", adminEmail);
                             }
                         }
                     }
                     else
                     {
-                        // Ensure user is in role
-                        var inRole = userManager.IsInRoleAsync(admin, roleName).GetAwaiter().GetResult();
+                        // Ensure user is in Admin role
+                        var inRole = userManager.IsInRoleAsync(admin, "Admin").GetAwaiter().GetResult();
                         if (!inRole)
                         {
-                            var addRoleRes = userManager.AddToRoleAsync(admin, roleName).GetAwaiter().GetResult();
+                            var addRoleRes = userManager.AddToRoleAsync(admin, "Admin").GetAwaiter().GetResult();
                             if (!addRoleRes.Succeeded)
                             {
                                 Log.Logger.Warning("Failed to add existing dev admin to role: {Errors}", string.Join(',', addRoleRes.Errors.Select(e => e.Description)));

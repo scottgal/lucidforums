@@ -19,6 +19,11 @@ public class Message
     // Score (0-100) indicating how well this message aligns with the forum's charter; null if not evaluated
     public double? CharterScore { get; set; }
 
+    /// <summary>
+    /// Source language of the message content (ISO 639-1 code, e.g., "en", "es", "fr")
+    /// </summary>
+    public string SourceLanguage { get; set; } = "en";
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }
     public User? CreatedBy { get; set; }

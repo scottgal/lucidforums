@@ -15,4 +15,11 @@ public class CreateForumVm
     [RegularExpression("^[a-z0-9-]*$", ErrorMessage = "Slug can only contain lowercase letters, numbers, and hyphens.")]
     [StringLength(120)]
     public string? Slug { get; set; }
+
+    [Display(Name = "Charter (optional)")]
+    public Guid? CharterId { get; set; }
+
+    [Display(Name = "Source Language")]
+    [StringLength(10)]
+    public string SourceLanguage { get; set; } = "auto";
 }

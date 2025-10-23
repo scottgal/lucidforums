@@ -31,7 +31,7 @@ public class ForumSeedingHostedService(
                 var forumService = sp.GetRequiredService<IForumService>();
 
                 // Create forum
-                var forum = await forumService.CreateAsync(job.ForumName, job.ForumSlug, job.Description, null, stoppingToken);
+                var forum = await forumService.CreateAsync(job.ForumName, job.ForumSlug, job.Description, null, "en", null, stoppingToken);
                 await Broadcast(job.JobId, "forum", $"Created forum {forum.Name}", forum.Id.ToString());
 
                 // Choose a charter to guide content tone
@@ -165,7 +165,7 @@ public class ForumSeedingHostedService(
                             var threadService2 = tsp.GetRequiredService<IThreadService>();
                             var messageService2 = tsp.GetRequiredService<IMessageService>();
 
-                            var thread = await threadService2.CreateAsync(forum.Id, TrimLine(title, 120), content, null, stoppingToken);
+                            var thread = await threadService2.CreateAsync(forum.Id, TrimLine(title, 120), content, null, "en", stoppingToken);
                             await Broadcast(job.JobId, "thread", $"Created thread '{thread.Title}' by {author}", thread.Id.ToString());
 
                             // Generate discovery-friendly tags using AI (overwrite heuristic tags if successful)
@@ -253,7 +253,7 @@ public class ForumSeedingHostedService(
                                     reply = AddEmoticonsToText(reply);
                                 }
                                 var replyAuthor = RandomAuthor();
-                                var msg = await messageService2.ReplyAsync(thread.Id, parent.Id, reply, null, stoppingToken);
+                                var msg = await messageService2.ReplyAsync(thread.Id, parent.Id, reply, null, "en", stoppingToken);
                                 priorMessages.Add((msg.Id, reply));
                                 await Broadcast(job.JobId, "reply", $"Reply by {replyAuthor}", msg.Id.ToString());
                             }

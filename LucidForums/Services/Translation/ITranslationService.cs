@@ -40,6 +40,12 @@ public interface ITranslationService
     /// Get all translation strings with their translations for a language
     /// </summary>
     Task<List<TranslationStringDto>> GetAllStringsWithTranslationsAsync(string languageCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Detect the language of the provided text using AI
+    /// Returns ISO 639-1 language code (e.g., "en", "es", "fr")
+    /// </summary>
+    Task<string> DetectLanguageAsync(string text, CancellationToken ct = default);
 }
 
 public record TranslationStringDto(string Key, string DefaultText, string? TranslatedText);

@@ -31,6 +31,7 @@ public class ContentTranslationService : IContentTranslationService
     public async Task<string?> GetTranslationAsync(string contentType, string contentId, string fieldName, string languageCode, CancellationToken ct = default)
     {
         var translation = await _db.ContentTranslations
+            .AsNoTracking()
             .FirstOrDefaultAsync(t =>
                 t.ContentType == contentType &&
                 t.ContentId == contentId &&
@@ -57,6 +58,27 @@ public class ContentTranslationService : IContentTranslationService
         {
             return existing.TranslatedText;
         }
+
+        // Notify clients that this content has been queued for translation (for subtle UI framing)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _hubContext.Clients.All.SendAsync(
+                    "ContentTranslationQueued",
+                    new
+                    {
+                        contentType,
+                        contentId,
+                        fieldName,
+                        language = targetLanguage
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to broadcast translation queued via SignalR");
+            }
+        });
 
         // Translate using AI
         var charter = new Charter
@@ -168,7 +190,7 @@ Text to translate:
 
     private async Task<int> TranslateForumsAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var forums = await _db.Forums.ToListAsync(ct);
+        var forums = await _db.Forums.AsNoTracking().ToListAsync(ct);
         var total = forums.Count * 2; // Name + Description
         var completed = 0;
         var translated = 0;
@@ -198,7 +220,7 @@ Text to translate:
 
     private async Task<int> TranslateThreadsAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var threads = await _db.Threads.ToListAsync(ct);
+        var threads = await _db.Threads.AsNoTracking().ToListAsync(ct);
         var total = threads.Count;
         var completed = 0;
         var translated = 0;
@@ -219,7 +241,7 @@ Text to translate:
 
     private async Task<int> TranslateMessagesAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var messages = await _db.Messages.ToListAsync(ct);
+        var messages = await _db.Messages.AsNoTracking().ToListAsync(ct);
         var total = messages.Count;
         var completed = 0;
         var translated = 0;

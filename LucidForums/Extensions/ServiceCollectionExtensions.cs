@@ -1,8 +1,10 @@
 ﻿using LucidForums.Data;
 using LucidForums.Helpers;
+using LucidForums.Models.Configuration;
 using LucidForums.Models.Entities;
 using LucidForums.Services.Ai;
 using LucidForums.Services.Ai.Providers;
+using LucidForums.Services.Auth;
 using LucidForums.Services.Charters;
 using LucidForums.Services.Forum;
 using LucidForums.Services.Llm;
@@ -12,12 +14,15 @@ using LucidForums.Services.Search;
 using LucidForums.Services.Seeding;
 using LucidForums.Services.Admin;
 using LucidForums.Services.Analysis;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using System.Text;
 
 namespace LucidForums.Extensions;
 
@@ -33,6 +38,8 @@ public static class ServiceCollectionExtensions
         services.Configure<EmbeddingOptions>(configuration.GetSection("Embedding"));
         // Telemetry config (names, tags, paths)
         services.ConfigurePOCO<TelemetryOptions>(configuration);
+        // JWT config
+        services.ConfigurePOCO<JwtOptions>(configuration);
         return services;
     }
 
@@ -71,6 +78,64 @@ public static class ServiceCollectionExtensions
         services.AddIdentity<User, IdentityRole>(options => { options.SignIn.RequireConfirmedAccount = false; })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
+
+        return services;
+    }
+
+    public static IServiceCollection AddLucidForumsAuthentication(this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var jwtSettings = configuration.GetSection("Jwt");
+        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.SaveToken = true;
+                options.RequireHttpsMetadata = false; // Set to true in production
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidAudience = jwtSettings["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                // Support for SignalR (query string token)
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
+            });
+
+        // Add authorization with policies
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("RequireUser", policy => policy.RequireRole("User", "Moderator", "Admin"));
+            options.AddPolicy("RequireModerator", policy => policy.RequireRole("Moderator", "Admin"));
+            options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
+        });
+
+        // Register token service
+        services.AddScoped<ITokenService, TokenService>();
 
         return services;
     }
@@ -146,6 +211,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Services.Translation.IContentTranslationQueue>(sp => sp.GetRequiredService<Services.Translation.ContentTranslationQueue>());
         services.AddHostedService<Services.Translation.ContentTranslationHostedService>();
 
+        // Setup service for first-run configuration
+        services.AddScoped<Services.Setup.ISetupService, Services.Setup.SetupService>();
+
         return services;
     }
 
@@ -219,6 +287,7 @@ public static class ServiceCollectionExtensions
             .AddLucidForumsMvcAndRealtime()
             .AddLucidForumsConfiguration(configuration)
             .AddLucidForumsDatabase(configuration)
+            .AddLucidForumsAuthentication(configuration)
             .AddLucidForumsAi()
             .AddLucidForumsSeeding()
             .AddLucidForumsModeration()

@@ -8,7 +8,7 @@ namespace LucidForums.Services.Forum;
 public interface IMessageService
 {
     Task<Message?> GetAsync(Guid id, CancellationToken ct = default);
-    Task<Message> ReplyAsync(Guid threadId, Guid? parentMessageId, string content, string? authorId, CancellationToken ct = default);
+    Task<Message> ReplyAsync(Guid threadId, Guid? parentMessageId, string content, string? authorId, string sourceLanguage = "en", CancellationToken ct = default);
     Task<List<Message>> ListByThreadAsync(Guid threadId, CancellationToken ct = default);
 }
 
@@ -19,7 +19,7 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
         return db.Messages.FirstOrDefaultAsync(m => m.Id == id, ct);
     }
 
-    public async Task<Message> ReplyAsync(Guid threadId, Guid? parentMessageId, string content, string? authorId, CancellationToken ct = default)
+    public async Task<Message> ReplyAsync(Guid threadId, Guid? parentMessageId, string content, string? authorId, string sourceLanguage = "en", CancellationToken ct = default)
     {
         // Validate author exists; otherwise use null to avoid FK violations
         string? validAuthorId = null;
@@ -39,6 +39,7 @@ public class MessageService(LucidForums.Data.ApplicationDbContext db, LucidForum
             ParentId = parentMessageId,
             Content = content,
             CreatedById = validAuthorId,
+            SourceLanguage = sourceLanguage,
             CreatedAtUtc = DateTime.UtcNow
         };
 

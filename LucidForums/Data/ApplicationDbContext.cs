@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<User>
     public DbSet<TranslationString> TranslationStrings => Set<TranslationString>();
     public DbSet<Translation> Translations => Set<Translation>();
     public DbSet<ContentTranslation> ContentTranslations => Set<ContentTranslation>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -173,6 +174,18 @@ public class ApplicationDbContext : IdentityDbContext<User>
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.ContentType, x.ContentId, x.FieldName, x.LanguageCode }).IsUnique();
             e.HasIndex(x => new { x.ContentType, x.ContentId });
+        });
+
+        // RefreshToken
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Token).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Enable PostgreSQL ltree extension if using Npgsql

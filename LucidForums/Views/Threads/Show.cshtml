@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = Model.Title;
 }
-<h1 class="text-2xl font-bold mb-2 thread-title" data-thread-id="@Model.Id" auto-translate="true" translation-category="thread.title">@Model.Title</h1>
+<h1 class="text-2xl font-bold mb-2 thread-title" data-thread-id="@Model.Id" auto-translate="true" translation-category="thread.title" translation-field="Title">@Model.Title</h1>
 <div class="flex items-center gap-3 mb-4 text-sm text-gray-600">
     @if (Model.CharterScore.HasValue)
     {

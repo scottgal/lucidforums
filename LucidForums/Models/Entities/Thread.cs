@@ -19,6 +19,11 @@ public class ForumThread
     // Centrally stored tags derived from the thread's content (title + root message)
     public List<string> Tags { get; set; } = new();
 
+    /// <summary>
+    /// Source language of the thread title and content (ISO 639-1 code, e.g., "en", "es", "fr")
+    /// </summary>
+    public string SourceLanguage { get; set; } = "en";
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedById { get; set; }
     public User? CreatedBy { get; set; }

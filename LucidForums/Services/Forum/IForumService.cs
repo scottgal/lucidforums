@@ -6,7 +6,7 @@ namespace LucidForums.Services.Forum;
 public interface IForumService
 {
     Task<LucidForums.Models.Entities.Forum?> GetBySlugAsync(string slug, CancellationToken ct = default);
-    Task<LucidForums.Models.Entities.Forum> CreateAsync(string name, string slug, string? description, string? createdById, CancellationToken ct = default);
+    Task<LucidForums.Models.Entities.Forum> CreateAsync(string name, string slug, string? description, string? createdById, string sourceLanguage = "en", Guid? charterId = null, CancellationToken ct = default);
     Task<List<LucidForums.Models.Entities.Forum>> ListAsync(int skip = 0, int take = 50, CancellationToken ct = default);
 }
 
@@ -17,7 +17,7 @@ public class ForumService(LucidForums.Data.ApplicationDbContext db) : IForumServ
         return await db.Forums.Include(f => f.Charter).FirstOrDefaultAsync(f => f.Slug == slug, ct);
     }
 
-    public async Task<LucidForums.Models.Entities.Forum> CreateAsync(string name, string slug, string? description, string? createdById, CancellationToken ct = default)
+    public async Task<LucidForums.Models.Entities.Forum> CreateAsync(string name, string slug, string? description, string? createdById, string sourceLanguage = "en", Guid? charterId = null, CancellationToken ct = default)
     {
         // Validate creator exists; otherwise, leave null to avoid FK violations
         string? validCreatorId = null;
@@ -40,6 +40,8 @@ public class ForumService(LucidForums.Data.ApplicationDbContext db) : IForumServ
             Slug = slug,
             Description = description,
             CreatedById = validCreatorId,
+            SourceLanguage = sourceLanguage,
+            CharterId = charterId,
             CreatedAtUtc = DateTime.UtcNow
         };
         db.Forums.Add(forum);

@@ -1,12 +1,15 @@
 ﻿using LucidForums.Models.ViewModels;
 using LucidForums.Services.Forum;
+using LucidForums.Services.Translation;
+using LucidForums.Services.Charters;
 using LucidForums.Extensions;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace LucidForums.Controllers;
 
-public class ForumController(IForumService forumService, IThreadService threadService, LucidForums.Web.Mapping.IAppMapper mapper) : Controller
+public class ForumController(IForumService forumService, IThreadService threadService, ITranslationService translationService, ICharterService charterService, LucidForums.Web.Mapping.IAppMapper mapper) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -48,8 +51,15 @@ public class ForumController(IForumService forumService, IThreadService threadSe
 
     [HttpGet]
     [Route("Forum/Create")]
-    public IActionResult Create()
+    public async Task<IActionResult> Create(CancellationToken ct)
     {
+        var charters = await charterService.ListAsync(ct);
+        ViewBag.Charters = charters.Select(c => new SelectListItem
+        {
+            Value = c.Id.ToString(),
+            Text = c.Name
+        }).ToList();
+
         return View(new CreateForumVm());
     }
 
@@ -63,6 +73,15 @@ public class ForumController(IForumService forumService, IThreadService threadSe
             Response.StatusCode = 400;
             return View(vm);
         }
+
+        // Detect language if "auto" is selected
+        var sourceLanguage = vm.SourceLanguage;
+        if (sourceLanguage == "auto")
+        {
+            var textToDetect = $"{vm.Name} {vm.Description}".Trim();
+            sourceLanguage = await translationService.DetectLanguageAsync(textToDetect, ct);
+        }
+
         var slug = string.IsNullOrWhiteSpace(vm.Slug) ? Slugify(vm.Name) : vm.Slug!.Trim().ToLowerInvariant();
         // naive uniqueness: append suffix until unique
         var baseSlug = slug;
@@ -71,7 +90,7 @@ public class ForumController(IForumService forumService, IThreadService threadSe
         {
             slug = baseSlug + "-" + i++;
         }
-        var forum = await forumService.CreateAsync(vm.Name.Trim(), slug, vm.Description, User?.Identity?.Name, ct);
+        var forum = await forumService.CreateAsync(vm.Name.Trim(), slug, vm.Description, User?.Identity?.Name, sourceLanguage, vm.CharterId, ct);
         return RedirectToAction("Details", new { slug = forum.Slug });
     }
 
@@ -107,9 +126,18 @@ public class ForumController(IForumService forumService, IThreadService threadSe
             Response.StatusCode = 400;
             return PartialView("_CreateThreadForm", vm);
         }
+
+        // Detect language if "auto" is selected
+        var sourceLanguage = vm.SourceLanguage;
+        if (sourceLanguage == "auto")
+        {
+            var textToDetect = $"{vm.Title} {vm.Content}".Trim();
+            sourceLanguage = await translationService.DetectLanguageAsync(textToDetect, ct);
+        }
+
         var title = vm.Title;
         var content = vm.Content;
-        var thread = await threadService.CreateAsync(forumId, title, content, User?.Identity?.Name, ct);
+        var thread = await threadService.CreateAsync(forumId, title, content, User?.Identity?.Name, sourceLanguage, ct);
         // Return the thread summary partial for list insertion
         var replyCount = 0;
         var lastInteraction = thread.CreatedAtUtc;
