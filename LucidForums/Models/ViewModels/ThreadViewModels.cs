@@ -1,6 +1,20 @@
 ﻿namespace LucidForums.Models.ViewModels;
 
-public record MessageVm(Guid Id, Guid? ParentId, string Content, string? AuthorId, DateTime CreatedAtUtc, int Depth, double? CharterScore);
+public record MessageVm(
+    Guid Id,
+    Guid? ParentId,
+    string OriginalContent,
+    string? AuthorId,
+    DateTime CreatedAtUtc,
+    int Depth,
+    double? CharterScore,
+    string? TranslatedContent = null,
+    string? SourceLanguage = null,
+    string? TargetLanguage = null)
+{
+    public bool IsTranslated => !string.IsNullOrWhiteSpace(TranslatedContent) && !string.Equals(SourceLanguage ?? "en", TargetLanguage ?? "en", StringComparison.OrdinalIgnoreCase);
+    public string Content => TranslatedContent ?? OriginalContent;
+}
 
 public record ThreadVm(Guid Id, string Title, Guid ForumId, string? AuthorId, DateTime CreatedAtUtc, IReadOnlyList<MessageVm> Messages, double? CharterScore, IReadOnlyList<string> Tags);
 

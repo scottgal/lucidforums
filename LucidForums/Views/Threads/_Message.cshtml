@@ -1,17 +1,36 @@
 ﻿@model LucidForums.Models.ViewModels.MessageVm
+@inject LucidForums.Helpers.TranslationHelper translator
 <li id="msg-@Model.Id" class="p-2 border rounded" style="margin-left:@(Model.Depth * 16)px" data-message-id="@Model.Id">
-    <div class="prose max-w-none message-content">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.Content).Replace("\n", "<br/>") )</div>
+    <div x-data="{ tab: '@(Model.IsTranslated ? "translated" : "original")' }">
+        @if (Model.IsTranslated)
+        {
+            <div role="tablist" class="tabs tabs-bordered mb-2">
+                <a role="tab" class="tab" x-bind:class="{ 'tab-active': tab === 'original' }" x-on:click.prevent="tab = 'original'" auto-translate="true" translation-category="thread.message.tab">Original</a>
+                <a role="tab" class="tab" x-bind:class="{ 'tab-active': tab === 'translated' }" x-on:click.prevent="tab = 'translated'" auto-translate="true" translation-category="thread.message.tab">Translated</a>
+            </div>
+            <div x-show="tab === 'translated'" class="prose max-w-none message-content">
+                @Html.Raw(System.Net.WebUtility.HtmlEncode(Model.TranslatedContent ?? Model.Content).Replace("\n", "<br/>") )
+            </div>
+            <div x-show="tab === 'original'" class="prose max-w-none message-content">
+                @Html.Raw(System.Net.WebUtility.HtmlEncode(Model.OriginalContent).Replace("\n", "<br/>") )
+            </div>
+        }
+        else
+        {
+            <div class="prose max-w-none message-content">@Html.Raw(System.Net.WebUtility.HtmlEncode(Model.OriginalContent).Replace("\n", "<br/>") )</div>
+        }
+    </div>
     <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">
         <span>@Model.CreatedAtUtc.ToString("g")</span>
         @if (Model.CharterScore.HasValue)
         {
-            <span title="Charter alignment score" class="px-1.5 py-0.5 rounded bg-gray-100 border">Score: @Model.CharterScore.Value.ToString("0")</span>
+            <span title="@await translator.T("thread.charter.tooltip", "Charter alignment score")" class="px-1.5 py-0.5 rounded bg-gray-100 border"><span auto-translate="true" translation-category="thread.message">Score:</span> @Model.CharterScore.Value.ToString("0")</span>
         }
     </div>
     <button class="btn btn-xs mt-2"
             hx-get="@Url.Action("Reply", "Threads", new { id = ViewContext.RouteData.Values["id"], parentId = Model.Id })"
             hx-target="#reply-form-@Model.Id"
-            hx-swap="innerHTML">
+            hx-swap="innerHTML" auto-translate="true" translation-category="thread.message.action">
         Reply
     </button>
     <div id="reply-form-@Model.Id"></div>

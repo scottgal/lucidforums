@@ -21,7 +21,17 @@ public class RuntimeAppMapper : IAppMapper
 
     public MessageVm ToMessageVm(MessageView src)
     {
-        return new MessageVm(src.Id, src.ParentId, src.Content, src.AuthorId, src.CreatedAtUtc, src.Depth, src.CharterScore);
+        return new MessageVm(
+            src.Id,
+            src.ParentId,
+            src.Content,
+            src.AuthorId,
+            src.CreatedAtUtc,
+            src.Depth,
+            src.CharterScore,
+            null,
+            null,
+            null);
     }
 
     public ThreadSummaryVm ToThreadSummaryVm(ForumThread src)

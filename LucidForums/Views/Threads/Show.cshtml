@@ -1,12 +1,13 @@
 @model LucidForums.Models.ViewModels.ThreadVm
+@inject LucidForums.Helpers.TranslationHelper translator
 @{
     ViewData["Title"] = Model.Title;
 }
-<h1 class="text-2xl font-bold mb-2" auto-translate="true" translation-category="thread.title">@Model.Title</h1>
+<h1 class="text-2xl font-bold mb-2 thread-title" data-thread-id="@Model.Id" auto-translate="true" translation-category="thread.title">@Model.Title</h1>
 <div class="flex items-center gap-3 mb-4 text-sm text-gray-600">
     @if (Model.CharterScore.HasValue)
     {
-        <span title="Charter alignment score" class="px-2 py-0.5 rounded bg-gray-100 border"><span auto-translate="true" translation-category="thread">Score:</span> @Model.CharterScore.Value.ToString("0")</span>
+        <span title="@await translator.T("thread.charter.tooltip", "Charter alignment score")" class="px-2 py-0.5 rounded bg-gray-100 border"><span auto-translate="true" translation-category="thread">Score:</span> @Model.CharterScore.Value.ToString("0")</span>
     }
     @if (Model.Tags != null && Model.Tags.Count > 0)
     {
@@ -28,7 +29,7 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js" integrity="sha512-mZJtJ7KkN6wY2/XKMlS4FtsbF5u1xZJ8x67zVGDJq5SgB7PehH0mUwc3f7+0JZcHikKQ8HkP1FQf4q2oQv2YEA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js" integrity="sha512-7SRCYIJtR6F8ocwW7UxW6wGKqbSyqREDbfCORCbGLatU0iugBLwyOXpzhkPyHIFdBO0K2VCu57fvP2Twgx1o2A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="~/js/forum-thread.js"></script>
 }

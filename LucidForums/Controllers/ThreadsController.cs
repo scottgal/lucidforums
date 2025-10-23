@@ -2,6 +2,7 @@
 using LucidForums.Models.ViewModels;
 using LucidForums.Services.Forum;
 using LucidForums.Services.Translation;
+using LucidForums.Services.Ai;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -15,7 +16,8 @@ public class ThreadsController(
     IContentTranslationService contentTranslationService,
     TranslationHelper translationHelper,
     LucidForums.Web.Mapping.IAppMapper mapper,
-    IHubContext<ForumHub> hubContext) : Controller
+    IHubContext<ForumHub> hubContext,
+    ITextAiService textAiService) : Controller
 {
     [HttpGet]
     [Route("Threads/{id:guid}")]
@@ -25,22 +27,67 @@ public class ThreadsController(
         if (view == null) return NotFound();
         var vm = mapper.ToThreadVm(view);
 
-        // Translate message content if user is viewing in non-English language
+        // Auto-translate message content if user is viewing in non-English language; also include original
         var language = translationHelper.GetCurrentLanguage();
-        if (language != "en" && vm.Messages != null && vm.Messages.Count > 0)
+
+        // Trigger translation for thread title so it updates via SignalR when ready
+        if (!string.IsNullOrWhiteSpace(language) && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
         {
-            var translatedMessages = new List<MessageVm>();
-            foreach (var message in vm.Messages)
+            var existingThreadTitle = await contentTranslationService.GetTranslationAsync(
+                "Thread",
+                vm.Id.ToString(),
+                "Title",
+                language,
+                ct);
+            if (string.IsNullOrWhiteSpace(existingThreadTitle))
             {
-                var translation = await contentTranslationService.GetTranslationAsync(
-                    "Message",
-                    message.Id.ToString(),
-                    "Content",
+                _ = contentTranslationService.TranslateContentAsync(
+                    "Thread",
+                    vm.Id.ToString(),
+                    "Title",
+                    vm.Title,
                     language,
                     ct);
+            }
+        }
 
-                var content = !string.IsNullOrEmpty(translation) ? translation : message.Content;
-                var translatedMessage = new MessageVm(message.Id, message.ParentId, content, message.AuthorId, message.CreatedAtUtc, message.Depth, message.CharterScore);
+        if (vm.Messages != null && vm.Messages.Count > 0)
+        {
+            var translatedMessages = new List<MessageVm>(vm.Messages.Count);
+            foreach (var message in vm.Messages)
+            {
+                string? translated = null;
+                if (!string.IsNullOrWhiteSpace(language) && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+                {
+                    var existing = await contentTranslationService.GetTranslationAsync(
+                        "Message",
+                        message.Id.ToString(),
+                        "Content",
+                        language,
+                        ct);
+                    if (string.IsNullOrWhiteSpace(existing))
+                    {
+                        // Trigger translation generation and broadcast via SignalR; UI will update when ready
+                        _ = contentTranslationService.TranslateContentAsync(
+                            "Message",
+                            message.Id.ToString(),
+                            "Content",
+                            message.Content,
+                            language,
+                            ct);
+                    }
+                }
+                var translatedMessage = new MessageVm(
+                    message.Id,
+                    message.ParentId,
+                    message.Content,
+                    message.AuthorId,
+                    message.CreatedAtUtc,
+                    message.Depth,
+                    message.CharterScore,
+                    translated,
+                    null,
+                    language);
                 translatedMessages.Add(translatedMessage);
             }
 
@@ -69,8 +116,31 @@ public class ThreadsController(
             return PartialView("_ReplyForm", vm);
         }
         var msg = await messageService.ReplyAsync(id, vm.ParentId, vm.Content, User?.Identity?.Name, ct);
-        var messageDto = new LucidForums.Models.Dtos.MessageView(msg.Id, msg.ParentId, msg.Content, msg.CreatedById, msg.CreatedAtUtc, 0, msg.CharterScore);
-        var messageVm = mapper.ToMessageVm(messageDto);
+
+        // Prepare view model with original and translated content for current language
+        var language = translationHelper.GetCurrentLanguage();
+        string? translated = null;
+        if (!string.IsNullOrWhiteSpace(language) && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await contentTranslationService.GetTranslationAsync(
+                "Message",
+                msg.Id.ToString(),
+                "Content",
+                language,
+                ct);
+            if (string.IsNullOrWhiteSpace(existing))
+            {
+                // Trigger translation but don't inline the result; clients will update via SignalR
+                _ = contentTranslationService.TranslateContentAsync(
+                    "Message",
+                    msg.Id.ToString(),
+                    "Content",
+                    msg.Content,
+                    language,
+                    ct);
+            }
+        }
+        var messageVm = new MessageVm(msg.Id, msg.ParentId, msg.Content, msg.CreatedById, msg.CreatedAtUtc, 0, msg.CharterScore, translated, null, language);
 
         // Notify listeners in this thread about the new message
         await hubContext.Clients.Group(ForumHub.GroupName(id.ToString()))
@@ -87,26 +157,29 @@ public class ThreadsController(
         if (msg == null) return NotFound();
         var depth = string.IsNullOrEmpty(msg.Path) ? 0 : msg.Path.Split('.').Length - 1;
 
-        var content = msg.Content;
-        // Translate if user is viewing in non-English language
         var language = translationHelper.GetCurrentLanguage();
-        if (language != "en")
+        string? translated = null;
+        if (!string.IsNullOrWhiteSpace(language) && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
         {
-            var translation = await contentTranslationService.GetTranslationAsync(
+            translated = await contentTranslationService.GetTranslationAsync(
                 "Message",
                 msg.Id.ToString(),
                 "Content",
                 language,
                 ct);
-
-            if (!string.IsNullOrEmpty(translation))
+            if (string.IsNullOrWhiteSpace(translated))
             {
-                content = translation;
+                translated = await contentTranslationService.TranslateContentAsync(
+                    "Message",
+                    msg.Id.ToString(),
+                    "Content",
+                    msg.Content,
+                    language,
+                    ct);
             }
         }
 
-        var messageDto = new LucidForums.Models.Dtos.MessageView(msg.Id, msg.ParentId, content, msg.CreatedById, msg.CreatedAtUtc, depth, msg.CharterScore);
-        var messageVm = mapper.ToMessageVm(messageDto);
+        var messageVm = new MessageVm(msg.Id, msg.ParentId, msg.Content, msg.CreatedById, msg.CreatedAtUtc, depth, msg.CharterScore, translated, null, language);
         return PartialView("_Message", messageVm);
     }
 }
