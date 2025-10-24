@@ -45,14 +45,65 @@
         condition: service_healthy
       ollama:
         condition: service_started
+      # Uncomment one of the EasyNMT services if you want to use EasyNMT for translations
+      # easynmt-cpu:
+      #   condition: service_started
+      # easynmt-gpu:
+      #   condition: service_started
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__Default=Host=db;Port=5432;Database=lucidforums;Username=lucid;Password=lucidpassword
       - OLLAMA_ENDPOINT=http://ollama:11434
       - Embedding__Model=mxbai-embed-large
+      # To enable EasyNMT translations, set provider and endpoint:
+      # - Translation__Provider=easynmt
+      # - EASYNMT_ENDPOINT=http://easynmt-cpu:8081/
+      # If you already have EasyNMT running on your host at localhost:24080, use:
+      # - EASYNMT_ENDPOINT=http://host.docker.internal:24080/  # Windows/macOS Docker
+      # For Linux, you may need to use the gateway IP instead, e.g. http://172.17.0.1:24080/
     ports:
       - "8080:8080"
+    networks:
+      - appnet
+
+  # EasyNMT CPU-only service (non-GPU). Uses a community image with a simple REST API at /translate
+  easynmt-cpu:
+    image: easynmt/api:2.0-cpu
+    container_name: lucidforums-easynmt-cpu
+    #ports:
+    #  - "8081:8081"
+    environment:
+      - EASYNMT_MODEL=opus-mt
+      - PORT=8081
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || curl -sf http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - appnet
+
+  # EasyNMT GPU service. Requires NVIDIA Container Toolkit on the host
+  easynmt-gpu:
+    image:  easynmt/api:2.0.2-cuda11.3
+    container_name: lucidforums-easynmt-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    runtime: nvidia
+    #ports:
+    #  - "8082:8081"
+    environment:
+      - EASYNMT_MODEL=opus-mt
+      - PORT=8081
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || curl -sf http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
     networks:
       - appnet
 

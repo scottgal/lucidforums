@@ -5,30 +5,38 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using LucidForums.Helpers;
 using System.Globalization;
+using Microsoft.Extensions.Configuration;
 
 namespace LucidForums.Services.Translation;
 
 public class TranslationService : ITranslationService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly ITextAiService _ai;
     private readonly IMemoryCache _cache;
     private readonly RequestTranslationCache _requestCache;
     private readonly ILogger<TranslationService> _logger;
     private readonly SemaphoreSlim _dbLock = new(1, 1);
+    private object? _externalTranslator; // resolved lazily to avoid hard reference if package not present (NOT readonly so it can be cached)
+    private readonly IConfiguration _configuration;
+    private readonly IServiceProvider _serviceProvider;
 
     public TranslationService(
-        ApplicationDbContext db,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
         ITextAiService ai,
         IMemoryCache cache,
         RequestTranslationCache requestCache,
-        ILogger<TranslationService> logger)
+        ILogger<TranslationService> logger,
+        IConfiguration configuration,
+        IServiceProvider serviceProvider)
     {
-        _db = db;
+        _dbFactory = dbFactory;
         _ai = ai;
         _cache = cache;
         _requestCache = requestCache;
         _logger = logger;
+        _configuration = configuration;
+        _serviceProvider = serviceProvider;
     }
 
     private static string NormalizeLanguageCode(string? input)
@@ -109,7 +117,8 @@ public class TranslationService : ITranslationService
 
             // Get translation from database using AsNoTracking to avoid concurrency issues
             // Use a single query with Include to avoid multiple DbContext operations
-            var translationData = await _db.TranslationStrings
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+            var translationData = await db.TranslationStrings
                 .AsNoTracking()
                 .Where(ts => ts.Key == key)
                 .Select(ts => new
@@ -156,7 +165,8 @@ public class TranslationService : ITranslationService
         try
         {
             // Use a single tracked query to avoid mixing tracked/untracked
-            var existing = await _db.TranslationStrings
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+            var existing = await db.TranslationStrings
                 .Where(ts => ts.Key == key)
                 .FirstOrDefaultAsync(ct);
 
@@ -167,7 +177,7 @@ public class TranslationService : ITranslationService
                 {
                     existing.DefaultText = defaultText;
                     existing.UpdatedAtUtc = DateTime.UtcNow;
-                    await _db.SaveChangesAsync(ct);
+                    await db.SaveChangesAsync(ct);
                     // Invalidate default language cache so UI picks up updated default immediately
                     _cache.Remove($"trans:en:{key}");
                 }
@@ -182,14 +192,49 @@ public class TranslationService : ITranslationService
                 Context = context
             };
 
-            _db.TranslationStrings.Add(newString);
-            await _db.SaveChangesAsync(ct);
+            db.TranslationStrings.Add(newString);
+            await db.SaveChangesAsync(ct);
             return newString.Id;
         }
         finally
         {
             _dbLock.Release();
         }
+    }
+
+    private static string CleanAiOutput(string aiOutput, string originalText)
+    {
+        if (string.IsNullOrWhiteSpace(aiOutput)) return originalText;
+        var s = aiOutput.Trim();
+
+        // Strip Markdown code fences
+        if (s.StartsWith("```"))
+        {
+            var end = s.IndexOf("```", 3, StringComparison.Ordinal);
+            if (end > 3)
+            {
+                s = s.Substring(3, end - 3).Trim();
+            }
+        }
+
+        // Strip surrounding quotes
+        if ((s.StartsWith("\"") && s.EndsWith("\"")) || (s.StartsWith("“") && s.EndsWith("”")) || (s.StartsWith("'") && s.EndsWith("'")))
+        {
+            s = s.Substring(1, s.Length - 2).Trim();
+        }
+
+        // Remove leading language/code labels like "es:" or "s :"
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"^\s*[a-z]{1,3}\s*:\s*", string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // Remove trailing or standalone notes like "(Note: ...)" at the end
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*\(Note:[\s\S]*\)$", string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // Remove any lines that begin with Note-like prefixes
+        var lines = s.Split('\n');
+        lines = lines.Where(l => !System.Text.RegularExpressions.Regex.IsMatch(l.Trim(), @"^(note|nota|remarque|hinweis)\s*:", System.Text.RegularExpressions.RegexOptions.IgnoreCase)).ToArray();
+        s = string.Join("\n", lines).Trim();
+
+        return string.IsNullOrWhiteSpace(s) ? originalText : s;
     }
 
     public async Task<string> TranslateAsync(string text, string targetLanguage, string? sourceLanguage = "en", CancellationToken ct = default)
@@ -223,43 +268,201 @@ public class TranslationService : ITranslationService
         var hash = ContentHash.Generate(text, 8);
         var cacheKey = $"ai-trans:{normSrc}:{normTgt}:{hash}";
 
-        // Use memory cache to avoid repeated LLM calls; GetOrCreateAsync deduplicates concurrent callers
-        var translated = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        // Use memory cache to avoid repeated calls
+        var translated = await _cache.GetOrCreateAsync<string>(cacheKey, async entry =>
         {
             entry.SlidingExpiration = TimeSpan.FromDays(7);
 
-            // Create a charter for translation context
-            var charter = new Charter
-            {
-                Name = "Translation",
-                Purpose = $"Translate text from {normSrc} to {normTgt} accurately and naturally"
-            };
+            // Decide order based on configured provider. Default to EasyNMT-first.
+            var providerMode = (_configuration["Translation:Provider"] ?? "easynmt").Trim().ToLowerInvariant();
+            var srcCodeEff = NormalizeLanguageCode(normSrc);
+            var tgtCodeEff = NormalizeLanguageCode(normTgt);
 
-            var prompt = $@"Translate the following text from {normSrc} to {normTgt}.
+            async Task<string?> TryExternalAsync()
+            {
+                try
+                {
+                    var isEnabled = IsExternalTranslationEnabled();
+                    _logger.LogDebug("External translation enabled: {Enabled}", isEnabled);
+                    if (!isEnabled) return null;
+
+                    var ext = GetExternalTranslator();
+                    _logger.LogDebug("External translator resolved: {HasTranslator}", ext != null);
+                    if (ext == null) return null;
+
+                    _logger.LogInformation("Calling EasyNMT for translation: {Text} -> {Target}", text.Substring(0, Math.Min(50, text.Length)), tgtCodeEff);
+                    var t = await InvokeExternalTranslateAsync(ext, text, tgtCodeEff,
+                        srcCodeEff == "en" && string.Equals(src, "English", StringComparison.OrdinalIgnoreCase) ? "en" : srcCodeEff, ct);
+
+                    if (string.IsNullOrWhiteSpace(t))
+                    {
+                        _logger.LogWarning("EasyNMT returned empty translation");
+                        return null;
+                    }
+
+                    // Treat exact echo as failure (common on server errors)
+                    if (string.Equals(t, text, StringComparison.Ordinal))
+                    {
+                        _logger.LogWarning("EasyNMT returned original text (likely error)");
+                        return null;
+                    }
+
+                    _logger.LogInformation("EasyNMT translation successful: {Result}", t.Substring(0, Math.Min(50, t.Length)));
+                    return t;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "External translator failed");
+                    return null;
+                }
+            }
+
+            async Task<string?> TryLlmAsync()
+            {
+                try
+                {
+                    var charter = new Charter
+                    {
+                        Name = "Translation",
+                        Purpose = $"Translate text from {normSrc} to {normTgt} accurately and naturally"
+                    };
+
+                    var prompt = $@"Translate the following text from {normSrc} to {normTgt}.
 Preserve formatting, placeholders (like {{0}}, {{name}}), and HTML tags if present.
-Return ONLY the translated text, no explanations.
+Return ONLY the translated text. Do not add any notes, explanations, language labels (like 'es:'), quotes, or extra punctuation. Output should be the translation text only.
 
 Text to translate:
 {text}";
 
-            var result = await _ai.GenerateAsync(charter, prompt, ct: ct);
-            var cleaned = (result ?? string.Empty).Trim();
-            // If AI returns empty, fall back to original text but do not cache empty responses
-            if (string.IsNullOrWhiteSpace(cleaned))
-            {
-                // Cache the fallback to prevent re-hitting the AI for known-problem inputs
-                cleaned = text;
+                    var result = await _ai.GenerateAsync(charter, prompt, ct: ct);
+                    var cleaned = CleanAiOutput(result ?? string.Empty, text);
+                    if (string.IsNullOrWhiteSpace(cleaned)) return null;
+                    return cleaned;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "LLM translation failed");
+                    return null;
+                }
             }
-            return cleaned;
+
+            if (providerMode == "llm")
+            {
+                // LLM first, then fallback to EasyNMT if available
+                var llm = await TryLlmAsync();
+                if (!string.IsNullOrWhiteSpace(llm)) return llm!;
+                var ext = await TryExternalAsync();
+                if (!string.IsNullOrWhiteSpace(ext)) return ext!;
+                return text; // final fallback
+            }
+            else
+            {
+                // EasyNMT first (default), then fallback to LLM
+                var ext = await TryExternalAsync();
+                if (!string.IsNullOrWhiteSpace(ext)) return ext!;
+
+                _logger.LogInformation("EasyNMT failed or unavailable, falling back to LLM translation for {Source} -> {Target}", normSrc, normTgt);
+                var llm = await TryLlmAsync();
+                if (!string.IsNullOrWhiteSpace(llm))
+                {
+                    _logger.LogInformation("LLM translation successful as fallback");
+                    return llm!;
+                }
+
+                _logger.LogWarning("Both EasyNMT and LLM translation failed, returning original text");
+                return text; // final fallback
+            }
         });
 
         return translated ?? text;
     }
 
+    private bool IsExternalTranslationEnabled()
+    {
+        try
+        {
+            var provider = _configuration["Translation:Provider"]; // e.g., "easynmt"
+            if (!string.IsNullOrWhiteSpace(provider) && provider.Equals("easynmt", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Consider both environment-style and appsettings-style endpoints
+            var endpointEnv = _configuration["EASYNMT_ENDPOINT"]; // e.g., http://host.docker.internal:24080/
+            if (!string.IsNullOrWhiteSpace(endpointEnv)) return true;
+
+            var endpointConfig = _configuration["Translation:EasyNmt:Endpoint"]; // e.g., http://localhost:24080/
+            return !string.IsNullOrWhiteSpace(endpointConfig);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private object? GetExternalTranslator()
+    {
+        if (_externalTranslator != null) return _externalTranslator;
+        try
+        {
+            var ifaceType = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .Select(a => a.GetType("mostlylucid.llmtranslate.Services.IAiTranslationProvider"))
+                .FirstOrDefault(t => t != null);
+            if (ifaceType == null)
+            {
+                _logger.LogDebug("Could not find IAiTranslationProvider type in loaded assemblies");
+                return null;
+            }
+            var svc = _serviceProvider.GetService(ifaceType);
+            if (svc != null)
+            {
+                _externalTranslator = svc; // Cache the resolved service
+                _logger.LogDebug("Resolved and cached external translator: {Type}", svc.GetType().Name);
+            }
+            else
+            {
+                _logger.LogDebug("IAiTranslationProvider type found but service not registered in DI");
+            }
+            return svc;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resolving external translator");
+            return null;
+        }
+    }
+
+    private async Task<string?> InvokeExternalTranslateAsync(object translator, string text, string targetLanguage, string? sourceLanguage, CancellationToken ct)
+    {
+        try
+        {
+            var type = translator.GetType();
+            var method = type.GetMethod("TranslateAsync", new[] { typeof(string), typeof(string), typeof(string), typeof(CancellationToken) });
+            if (method == null)
+            {
+                // Try overload with optional sourceLanguage (nullable)
+                var methods = type.GetMethods().Where(m => m.Name == "TranslateAsync").ToList();
+                method = methods.FirstOrDefault();
+            }
+            if (method == null) return null;
+            var args = new object?[] { text, targetLanguage, sourceLanguage, ct };
+            var task = method.Invoke(translator, args) as Task<string>;
+            if (task != null)
+            {
+                return await task.ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to call external translator via reflection");
+        }
+        return null;
+    }
+
     public async Task<int> TranslateAllStringsAsync(string targetLanguage, bool overwriteExisting = false, IProgress<TranslationProgress>? progress = null, CancellationToken ct = default)
     {
         var lang = NormalizeLanguageCode(targetLanguage);
-        var strings = await _db.TranslationStrings
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var strings = await db.TranslationStrings
             .Include(ts => ts.Translations)
             .ToListAsync(ct);
 
@@ -312,10 +515,10 @@ Text to translate:
                         Source = TranslationSource.AiGenerated,
                         AiModel = "Translation AI"
                     };
-                    _db.Translations.Add(newTranslation);
+                    db.Translations.Add(newTranslation);
                 }
 
-                await _db.SaveChangesAsync(ct);
+                await db.SaveChangesAsync(ct);
                 translated++;
 
                 // Invalidate cache
@@ -335,7 +538,8 @@ Text to translate:
 
     public async Task<List<string>> GetAvailableLanguagesAsync(CancellationToken ct = default)
     {
-        var languages = await _db.Translations
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var languages = await db.Translations
             .Select(t => t.LanguageCode)
             .ToListAsync(ct);
 
@@ -356,7 +560,8 @@ Text to translate:
     public async Task<TranslationStats> GetStatsAsync(string languageCode, CancellationToken ct = default)
     {
         var lang = NormalizeLanguageCode(languageCode);
-        var totalStrings = await _db.TranslationStrings.CountAsync(ct);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var totalStrings = await db.TranslationStrings.CountAsync(ct);
 
         if (lang == "en")
         {
@@ -369,7 +574,7 @@ Text to translate:
             );
         }
 
-        var translatedCount = await _db.Translations
+        var translatedCount = await db.Translations
             .Where(t => t.LanguageCode == lang)
             .CountAsync(ct);
 
@@ -388,7 +593,8 @@ Text to translate:
     public async Task<List<TranslationStringDto>> GetAllStringsWithTranslationsAsync(string languageCode, CancellationToken ct = default)
     {
         var lang = NormalizeLanguageCode(languageCode);
-        var strings = await _db.TranslationStrings
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var strings = await db.TranslationStrings
             .Include(ts => ts.Translations.Where(t => t.LanguageCode == lang))
             .ToListAsync(ct);
 

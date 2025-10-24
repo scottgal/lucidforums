@@ -206,6 +206,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Services.Translation.IPageLanguageSwitchService, Services.Translation.PageLanguageSwitchService>();
         services.AddScoped<TranslationHelper>();
 
+        // Register EasyNMT translation provider for external translation
+        services.AddHttpClient<mostlylucid.llmtranslate.Services.IAiTranslationProvider, mostlylucid.llmtranslate.Services.Providers.EasyNmtTranslationProvider>();
+
         // Content translation queue and background service
         services.AddSingleton<Services.Translation.ContentTranslationQueue>();
         services.AddSingleton<Services.Translation.IContentTranslationQueue>(sp => sp.GetRequiredService<Services.Translation.ContentTranslationQueue>());
@@ -220,7 +223,18 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddLucidForumsMvcAndRealtime(this IServiceCollection services)
     {
-        services.AddControllersWithViews();
+        services.AddControllersWithViews()
+            .ConfigureApplicationPartManager(apm =>
+            {
+                // Remove controllers from mostlylucid.llmtranslate to avoid route conflicts
+                var toRemove = apm.ApplicationParts
+                    .Where(p => p.Name == "mostlylucid.llmtranslate")
+                    .ToList();
+                foreach (var part in toRemove)
+                {
+                    apm.ApplicationParts.Remove(part);
+                }
+            });
         services.AddRazorPages();
         services.AddRazorComponents();
         services.AddSignalR();
@@ -284,6 +298,37 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddLucidForumsAll(this IServiceCollection services, IConfiguration configuration)
     {
+        // Optional: register EasyNMT-based translation provider if configured
+        var translationProvider = configuration["Translation:Provider"];
+        var easynmtEndpoint = configuration["EASYNMT_ENDPOINT"] ?? configuration["Translation:EasyNmt:Endpoint"]; // e.g., http://easynmt:8081/ or http://localhost:24080/
+        if (!string.IsNullOrWhiteSpace(translationProvider) && translationProvider.Equals("easynmt", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(easynmtEndpoint))
+        {
+            // Register HttpClient and IAiTranslationProvider from the mostlylucid.llmtranslate package
+            services.AddHttpClient("easynmt", client =>
+            {
+                var baseUrl = string.IsNullOrWhiteSpace(easynmtEndpoint) ? "http://localhost:24080/" : easynmtEndpoint;
+                client.BaseAddress = new Uri(baseUrl);
+                client.Timeout = TimeSpan.FromSeconds(120);
+            });
+            // Use reflection to avoid hard reference if the package isn't present at compile time
+            var providerType = Type.GetType("mostlylucid.llmtranslate.Services.Providers.EasyNmtTranslationProvider, mostlylucid.llmtranslate");
+            var ifaceType = Type.GetType("mostlylucid.llmtranslate.Services.IAiTranslationProvider, mostlylucid.llmtranslate");
+            if (providerType != null && ifaceType != null)
+            {
+                services.AddScoped(ifaceType, sp =>
+                {
+                    var factory = sp.GetRequiredService<IHttpClientFactory>();
+                    var http = factory.CreateClient("easynmt");
+                    // Construct EasyNmtTranslationProvider(HttpClient, ILogger<EasyNmtTranslationProvider>, string? baseUrl = null)
+                    var loggerType = typeof(ILogger<>).MakeGenericType(providerType);
+                    var logger = sp.GetRequiredService(loggerType);
+                    return Activator.CreateInstance(providerType, http, logger, easynmtEndpoint)!
+                           ?? throw new InvalidOperationException("Failed to create EasyNmtTranslationProvider");
+                });
+            }
+        }
+
         return services
             .AddLucidForumsMvcAndRealtime()
             .AddLucidForumsConfiguration(configuration)

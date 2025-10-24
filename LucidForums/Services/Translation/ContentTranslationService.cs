@@ -3,7 +3,6 @@ using System.Text;
 using LucidForums.Data;
 using LucidForums.Hubs;
 using LucidForums.Models.Entities;
-using LucidForums.Services.Ai;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,20 +10,20 @@ namespace LucidForums.Services.Translation;
 
 public class ContentTranslationService : IContentTranslationService
 {
-    private readonly ApplicationDbContext _db;
-    private readonly ITextAiService _ai;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
+    private readonly ITranslationService _translationService;
     private readonly ILogger<ContentTranslationService> _logger;
     private readonly IHubContext<TranslationHub> _hubContext;
     private readonly SemaphoreSlim _dbLock = new(1, 1);
 
     public ContentTranslationService(
-        ApplicationDbContext db,
-        ITextAiService ai,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
+        ITranslationService translationService,
         ILogger<ContentTranslationService> logger,
         IHubContext<TranslationHub> hubContext)
     {
-        _db = db;
-        _ai = ai;
+        _dbFactory = dbFactory;
+        _translationService = translationService;
         _logger = logger;
         _hubContext = hubContext;
     }
@@ -34,7 +33,8 @@ public class ContentTranslationService : IContentTranslationService
         await _dbLock.WaitAsync(ct);
         try
         {
-            var translation = await _db.ContentTranslations
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+            var translation = await db.ContentTranslations
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t =>
                     t.ContentType == contentType &&
@@ -59,9 +59,11 @@ public class ContentTranslationService : IContentTranslationService
         await _dbLock.WaitAsync(ct);
         try
         {
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+
             // OPTIMIZATION: First check if ANY content with this hash + language already has a translation
             // This allows reusing translations across different threads/messages with identical content
-            var reusableTranslation = await _db.ContentTranslations
+            var reusableTranslation = await db.ContentTranslations
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t =>
                     t.SourceHash == sourceHash &&
@@ -71,7 +73,7 @@ public class ContentTranslationService : IContentTranslationService
             if (reusableTranslation != null)
             {
                 // Found a reusable translation! Store a reference for this specific content
-                var reference = await _db.ContentTranslations
+                var reference = await db.ContentTranslations
                     .FirstOrDefaultAsync(t =>
                         t.ContentType == contentType &&
                         t.ContentId == contentId &&
@@ -92,15 +94,15 @@ public class ContentTranslationService : IContentTranslationService
                         Source = reusableTranslation.Source,
                         AiModel = reusableTranslation.AiModel
                     };
-                    _db.ContentTranslations.Add(reference);
-                    await _db.SaveChangesAsync(ct);
+                    db.ContentTranslations.Add(reference);
+                    await db.SaveChangesAsync(ct);
                 }
 
                 return reusableTranslation.TranslatedText;
             }
 
             // Check if we have a cached translation for this specific content
-            existing = await _db.ContentTranslations
+            existing = await db.ContentTranslations
                 .FirstOrDefaultAsync(t =>
                     t.ContentType == contentType &&
                     t.ContentId == contentId &&
@@ -138,27 +140,15 @@ public class ContentTranslationService : IContentTranslationService
             }
         });
 
-        // Translate using AI
-        var charter = new Charter
-        {
-            Name = "Content Translation",
-            Purpose = $"Translate {contentType} content accurately while preserving meaning and tone"
-        };
-
-        var prompt = $@"Translate the following {contentType} {fieldName} to {targetLanguage}.
-Preserve the original tone and meaning. Maintain paragraph breaks and formatting.
-Return ONLY the translated text, no explanations.
-
-Text to translate:
-{sourceText}";
-
-        var translatedText = await _ai.GenerateAsync(charter, prompt, ct: ct);
-        translatedText = translatedText?.Trim() ?? sourceText;
+        // Translate using TranslationService (which uses EasyNMT with LLM fallback)
+        var translatedText = await _translationService.TranslateAsync(sourceText, targetLanguage, sourceLanguage: "auto", ct: ct);
 
         // Save or update translation (with lock to prevent concurrent DbContext access)
         await _dbLock.WaitAsync(ct);
         try
         {
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+
             if (existing != null)
             {
                 existing.TranslatedText = translatedText;
@@ -177,12 +167,12 @@ Text to translate:
                     TranslatedText = translatedText,
                     SourceHash = sourceHash,
                     Source = TranslationSource.AiGenerated,
-                    AiModel = "Content Translation AI"
+                    AiModel = "EasyNMT/LLM"
                 };
-                _db.ContentTranslations.Add(newTranslation);
+                db.ContentTranslations.Add(newTranslation);
             }
 
-            await _db.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
         }
         finally
         {
@@ -238,7 +228,8 @@ Text to translate:
 
     public async Task MarkStaleAsync(string contentType, string contentId, string fieldName, CancellationToken ct = default)
     {
-        var translations = await _db.ContentTranslations
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var translations = await db.ContentTranslations
             .Where(t =>
                 t.ContentType == contentType &&
                 t.ContentId == contentId &&
@@ -251,12 +242,13 @@ Text to translate:
             translation.UpdatedAtUtc = DateTime.UtcNow;
         }
 
-        await _db.SaveChangesAsync(ct);
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<int> TranslateForumsAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var forums = await _db.Forums.AsNoTracking().ToListAsync(ct);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var forums = await db.Forums.AsNoTracking().ToListAsync(ct);
         var total = forums.Count * 2; // Name + Description
         var completed = 0;
         var translated = 0;
@@ -286,7 +278,8 @@ Text to translate:
 
     private async Task<int> TranslateThreadsAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var threads = await _db.Threads.AsNoTracking().ToListAsync(ct);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var threads = await db.Threads.AsNoTracking().ToListAsync(ct);
         var total = threads.Count;
         var completed = 0;
         var translated = 0;
@@ -307,7 +300,8 @@ Text to translate:
 
     private async Task<int> TranslateMessagesAsync(string targetLanguage, IProgress<TranslationProgress>? progress, CancellationToken ct)
     {
-        var messages = await _db.Messages.AsNoTracking().ToListAsync(ct);
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var messages = await db.Messages.AsNoTracking().ToListAsync(ct);
         var total = messages.Count;
         var completed = 0;
         var translated = 0;

@@ -216,10 +216,10 @@ public static class ApplicationBuilderExtensions
                 var requiredRoles = new[] { "User", "Moderator", "Admin" };
                 foreach (var roleName in requiredRoles)
                 {
-                    var roleExists = roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult();
+                    var roleExists = await roleManager.RoleExistsAsync(roleName);
                     if (!roleExists)
                     {
-                        var rres = roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
+                        var rres = await roleManager.CreateAsync(new IdentityRole(roleName));
                         if (!rres.Succeeded)
                         {
                             Log.Logger.Warning("Failed to create role {Role}: {Errors}", roleName, string.Join(',', rres.Errors.Select(e => e.Description)));
@@ -247,18 +247,18 @@ public static class ApplicationBuilderExtensions
                 if (userManager is not null)
                 {
                     var adminEmail = "devadmin@localhost";
-                    var admin = userManager.FindByEmailAsync(adminEmail).GetAwaiter().GetResult();
+                    var admin = await userManager.FindByEmailAsync(adminEmail);
                     if (admin is null)
                     {
                         admin = new User { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
-                        var createRes = userManager.CreateAsync(admin, "Password123!").GetAwaiter().GetResult();
+                        var createRes = await userManager.CreateAsync(admin, "Password123!");
                         if (!createRes.Succeeded)
                         {
                             Log.Logger.Warning("Failed to create dev admin user: {Errors}", string.Join(',', createRes.Errors.Select(e => e.Description)));
                         }
                         else
                         {
-                            var addRoleRes = userManager.AddToRoleAsync(admin, "Admin").GetAwaiter().GetResult();
+                            var addRoleRes = await userManager.AddToRoleAsync(admin, "Admin");
                             if (!addRoleRes.Succeeded)
                             {
                                 Log.Logger.Warning("Failed to add dev admin to role: {Errors}", string.Join(',', addRoleRes.Errors.Select(e => e.Description)));
@@ -272,10 +272,10 @@ public static class ApplicationBuilderExtensions
                     else
                     {
                         // Ensure user is in Admin role
-                        var inRole = userManager.IsInRoleAsync(admin, "Admin").GetAwaiter().GetResult();
+                        var inRole = await userManager.IsInRoleAsync(admin, "Admin");
                         if (!inRole)
                         {
-                            var addRoleRes = userManager.AddToRoleAsync(admin, "Admin").GetAwaiter().GetResult();
+                            var addRoleRes = await userManager.AddToRoleAsync(admin, "Admin");
                             if (!addRoleRes.Succeeded)
                             {
                                 Log.Logger.Warning("Failed to add existing dev admin to role: {Errors}", string.Join(',', addRoleRes.Errors.Select(e => e.Description)));
@@ -294,7 +294,7 @@ public static class ApplicationBuilderExtensions
         // Seed sample charters (only if none exist yet)
         try
         {
-            var existingCharters = db.Charters.AsNoTracking().Take(1).ToList();
+            var existingCharters = await db.Charters.AsNoTracking().Take(1).ToListAsync();
             if (existingCharters.Count == 0)
             {
                 var samples = new List<LucidForums.Models.Entities.Charter>
@@ -349,7 +349,7 @@ public static class ApplicationBuilderExtensions
                     }
                 };
                 db.Charters.AddRange(samples);
-                db.SaveChanges();
+                await db.SaveChangesAsync();
             }
         }
         catch (Exception ex)
