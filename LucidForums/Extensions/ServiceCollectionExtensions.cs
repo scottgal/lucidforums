@@ -40,6 +40,8 @@ public static class ServiceCollectionExtensions
         services.ConfigurePOCO<TelemetryOptions>(configuration);
         // JWT config
         services.ConfigurePOCO<JwtOptions>(configuration);
+        // Seeding config
+        services.Configure<Models.Configuration.SeedingOptions>(configuration.GetSection("Seeding"));
         return services;
     }
 
@@ -169,6 +171,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IForumSeedingQueue, ForumSeedingQueue>();
         services.AddSingleton<ISeedingProgressStore, InMemorySeedingProgressStore>();
         services.AddHostedService<ForumSeedingHostedService>();
+        services.AddHostedService<Services.Seeding.AutoSeedingHostedService>();
         return services;
     }
 

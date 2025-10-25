@@ -170,6 +170,32 @@ public static class ApplicationBuilderExtensions
             await db.Database.ExecuteSqlRawAsync(@"INSERT INTO ""AppSettings"" (""Id"", ""GenerationProvider"", ""GenerationModel"", ""TranslationProvider"", ""TranslationModel"", ""EmbeddingProvider"", ""EmbeddingModel"")
             VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL)
             ON CONFLICT (""Id"") DO NOTHING;");
+
+            // Create TranslationQueue table for persistent translation queue
+            await db.Database.ExecuteSqlRawAsync(@"CREATE TABLE IF NOT EXISTS ""TranslationQueue"" (
+                ""Id"" uuid PRIMARY KEY,
+                ""ContentType"" text NOT NULL,
+                ""ContentId"" text NOT NULL,
+                ""FieldName"" text NOT NULL,
+                ""Content"" text NOT NULL,
+                ""SourceLanguage"" text NOT NULL DEFAULT 'en',
+                ""Priority"" integer NOT NULL DEFAULT 0,
+                ""AttemptCount"" integer NOT NULL DEFAULT 0,
+                ""MaxAttempts"" integer NOT NULL DEFAULT 3,
+                ""LastError"" text,
+                ""CreatedAtUtc"" timestamp without time zone NOT NULL,
+                ""ProcessedAtUtc"" timestamp without time zone,
+                ""IsProcessed"" boolean NOT NULL DEFAULT false
+            )");
+
+            // Create indexes for efficient queue operations
+            await db.Database.ExecuteSqlRawAsync(@"
+                CREATE INDEX IF NOT EXISTS ""IX_TranslationQueue_IsProcessed_Priority_CreatedAtUtc""
+                ON ""TranslationQueue"" (""IsProcessed"", ""Priority"", ""CreatedAtUtc"");
+
+                CREATE INDEX IF NOT EXISTS ""IX_TranslationQueue_ContentType_ContentId_FieldName_IsProcessed""
+                ON ""TranslationQueue"" (""ContentType"", ""ContentId"", ""FieldName"", ""IsProcessed"");
+            ");
         }
         catch
         {

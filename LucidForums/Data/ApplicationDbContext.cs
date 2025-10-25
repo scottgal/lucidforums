@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<User>
     public DbSet<TranslationString> TranslationStrings => Set<TranslationString>();
     public DbSet<Translation> Translations => Set<Translation>();
     public DbSet<ContentTranslation> ContentTranslations => Set<ContentTranslation>();
+    public DbSet<TranslationQueueItem> TranslationQueue => Set<TranslationQueueItem>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -154,6 +155,16 @@ public class ApplicationDbContext : IdentityDbContext<User>
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.ContentType, x.ContentId, x.FieldName, x.LanguageCode }).IsUnique();
             e.HasIndex(x => new { x.ContentType, x.ContentId });
+        });
+
+        // TranslationQueueItem
+        modelBuilder.Entity<TranslationQueueItem>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // Index for efficient queue polling (unprocessed items by priority and creation time)
+            e.HasIndex(x => new { x.IsProcessed, x.Priority, x.CreatedAtUtc });
+            // Index for deduplication (check if item already exists in queue)
+            e.HasIndex(x => new { x.ContentType, x.ContentId, x.FieldName, x.IsProcessed });
         });
 
         // RefreshToken

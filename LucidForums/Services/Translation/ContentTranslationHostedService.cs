@@ -1,4 +1,5 @@
 using LucidForums.Hubs;
+using LucidForums.Models.Entities;
 using Microsoft.AspNetCore.SignalR;
 
 namespace LucidForums.Services.Translation;
@@ -8,14 +9,14 @@ namespace LucidForums.Services.Translation;
 /// </summary>
 public class ContentTranslationHostedService : BackgroundService
 {
-    private readonly ContentTranslationQueue _queue;
+    private readonly IContentTranslationQueue _queue;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ContentTranslationHostedService> _logger;
     private readonly IHubContext<TranslationHub> _hubContext;
     private readonly IConfiguration _configuration;
 
     public ContentTranslationHostedService(
-        ContentTranslationQueue queue,
+        IContentTranslationQueue queue,
         IServiceProvider serviceProvider,
         ILogger<ContentTranslationHostedService> logger,
         IHubContext<TranslationHub> hubContext,
@@ -30,23 +31,62 @@ public class ContentTranslationHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Content translation background service started");
+        _logger.LogInformation("Content translation background service started (PostgreSQL-backed queue)");
 
         // Ping EasyNMT on startup to verify connectivity
         await PingEasyNmtAsync(stoppingToken);
 
-        await foreach (var item in _queue.Reader.ReadAllAsync(stoppingToken))
+        // Log any existing items in the queue from previous runs
+        var pendingCount = await _queue.GetPendingCountAsync(stoppingToken);
+        if (pendingCount > 0)
+        {
+            _logger.LogInformation("Found {Count} pending translation items from previous runs", pendingCount);
+        }
+
+        // Process queue with polling (persistent across restarts)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await ProcessTranslationAsync(item, stoppingToken);
+                var item = await _queue.DequeueAsync(stoppingToken);
+                if (item != null)
+                {
+                    try
+                    {
+                        await ProcessTranslationAsync(item, stoppingToken);
+                        await _queue.MarkProcessedAsync(item.Id, stoppingToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing translation for {ContentType} {ContentId}",
+                            item.ContentType, item.ContentId);
+                        await _queue.MarkFailedAsync(item.Id, ex.Message, stoppingToken);
+                    }
+                }
+                else
+                {
+                    // No items in queue, wait before polling again
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+
+                // Periodically clean up old processed items (every 100 items processed)
+                if (Random.Shared.Next(100) == 0)
+                {
+                    await _queue.CleanupOldItemsAsync(daysToKeep: 7, stoppingToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing translation for {ContentType} {ContentId}",
-                    item.ContentType, item.ContentId);
+                _logger.LogError(ex, "Unexpected error in translation service");
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
             }
         }
+
+        _logger.LogInformation("Content translation background service stopped");
     }
 
     private async Task PingEasyNmtAsync(CancellationToken ct)

@@ -1,0 +1,17 @@
+
+
+services:
+  translator:
+    image:  ghcr.io/opennmt/ctranslate2:latest-ubuntu22.04-cuda12.2
+    container_name: ctranslate2
+    restart: unless-stopped
+    ports:
+      - "5000:4000"   # map container port 4000 to host 5000
+    volumes:
+      - ./models:/models
+    command: >
+      ctranslate2_server
+      --model /models/m2m100
+      --port 4000
+      --num-threads 4
+

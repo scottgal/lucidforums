@@ -128,15 +128,20 @@ public partial class AutoTranslateTagHelper : TagHelper
 
         // Generate deterministic ID for HTMX OOB targeting
         var elementId = $"t-{ContentHash.Generate(translationKey)}";
+        var contentHash = ContentHash.Generate(originalText);
 
         // Add attributes for translation system
         output.Attributes.RemoveAll("auto-translate");
         output.Attributes.SetAttribute("id", elementId);
         output.Attributes.SetAttribute("data-translate-key", translationKey);
-        output.Attributes.SetAttribute("data-content-hash", ContentHash.Generate(originalText));
+        output.Attributes.SetAttribute("data-content-hash", contentHash);
+        output.Attributes.SetAttribute("data-translate-type", "ui-string");
+
+        // Add progress indicator wrapper
+        var progressIndicator = "<span class=\"translate-progress\" style=\"display:none;\"><span class=\"loading loading-spinner loading-xs ml-1\"></span></span>";
 
         // Set translated content; allow HTML in translations
-        output.Content.SetHtmlContent(translatedText);
+        output.Content.SetHtmlContent($"{translatedText}{progressIndicator}");
     }
 
     private async Task ProcessContentTranslationAsync(string originalText, TagHelperOutput output, string? forumId, string? threadId, string? messageId)
@@ -171,10 +176,20 @@ public partial class AutoTranslateTagHelper : TagHelper
         // Get current user's language
         var targetLanguage = _translator.GetCurrentLanguage();
 
-        // Remove the auto-translate attribute
-        output.Attributes.RemoveAll("auto-translate");
+        // Generate unique element ID for HTMX OOB targeting
+        var elementId = $"content-{contentType}-{contentId}-{TranslationField}";
+        var contentHash = ContentHash.Generate(originalText);
 
-        // If English, no need to translate - just render original
+        // Remove the auto-translate attribute and add tracking attributes
+        output.Attributes.RemoveAll("auto-translate");
+        output.Attributes.SetAttribute("id", elementId);
+        output.Attributes.SetAttribute("data-content-type", contentType);
+        output.Attributes.SetAttribute("data-content-id", contentId);
+        output.Attributes.SetAttribute("data-content-field", TranslationField!);
+        output.Attributes.SetAttribute("data-content-hash", contentHash);
+        output.Attributes.SetAttribute("data-translate-type", "content");
+
+        // If English, no need to translate - just render original with attributes
         if (targetLanguage.Equals("en", StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -197,15 +212,21 @@ public partial class AutoTranslateTagHelper : TagHelper
                 contentType, contentId, TranslationField);
         }
 
+        // Progress indicator
+        var progressIndicator = "<span class=\"translate-progress\" style=\"display:none;\"><span class=\"loading loading-spinner loading-xs ml-1\"></span></span>";
+
         // If we have a translation, use it
         if (!string.IsNullOrWhiteSpace(translatedText))
         {
             // For content translations, encode HTML and preserve line breaks
             var encoded = System.Net.WebUtility.HtmlEncode(translatedText).Replace("\n", "<br/>");
-            output.Content.SetHtmlContent(encoded);
+            output.Content.SetHtmlContent($"{encoded}{progressIndicator}");
         }
         else
         {
+            // Show progress indicator while pending
+            output.Content.SetHtmlContent($"{System.Net.WebUtility.HtmlEncode(originalText).Replace("\n", "<br/>")}{progressIndicator}");
+
             // Queue translation in background with a new scope (fire-and-forget)
             // This avoids DbContext concurrency issues by creating a new service scope
             _ = Task.Run(async () =>
@@ -230,7 +251,6 @@ public partial class AutoTranslateTagHelper : TagHelper
                         contentType, contentId, TranslationField);
                 }
             });
-            // Keep original text while translation is pending
         }
     }
 }

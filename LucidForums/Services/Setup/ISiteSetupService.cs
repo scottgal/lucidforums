@@ -20,6 +20,19 @@ public interface ISiteSetupService
         int threadsPerForum = 10,
         int repliesPerThread = 5,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates multi-language content for testing auto-translation features
+    /// </summary>
+    Task<SiteSetupResult> GenerateMultiLanguageContentAsync(
+        int forumCount = 5,
+        int threadsPerForum = 10,
+        int repliesPerThread = 8,
+        string[] languages = null!,
+        int forumDelayMs = 2000,
+        int threadDelayMs = 1000,
+        int replyDelayMs = 500,
+        CancellationToken ct = default);
 }
 
 public class SiteSetupResult

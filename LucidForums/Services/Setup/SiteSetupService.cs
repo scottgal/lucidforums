@@ -410,7 +410,7 @@ public class SiteSetupService : ISiteSetupService
         try
         {
             var charter = new Charter { Name = "ContentGenerator", Purpose = "Generate replies" };
-            var prompt = $"Write a forum reply IN {languageName} to a thread titled '{threadTitle}'. Be helpful and conversational. 1-2 sentences. Write entirely in {languageName}.";
+            var prompt = $"Write a forum reply IN {languageName} to a thread titled '{threadTitle}'. With content '{originalContent} and language {languageName}. Be helpful and conversational. 1-4 sentences. Write entirely in {languageName}.";
             var reply = await _ai.GenerateAsync(charter, prompt, ct: ct);
             return string.IsNullOrWhiteSpace(reply) ? "Interesting point! I'd like to hear more perspectives on this." : reply.Trim();
         }
@@ -418,6 +418,163 @@ public class SiteSetupService : ISiteSetupService
         {
             return "Interesting point! I'd like to hear more perspectives on this.";
         }
+    }
+
+    public async Task<SiteSetupResult> GenerateMultiLanguageContentAsync(
+        int forumCount = 5,
+        int threadsPerForum = 10,
+        int repliesPerThread = 8,
+        string[] languages = null!,
+        int forumDelayMs = 2000,
+        int threadDelayMs = 1000,
+        int replyDelayMs = 500,
+        CancellationToken ct = default)
+    {
+        var result = new SiteSetupResult { Success = true };
+        languages ??= SupportedLanguages.Keys.ToArray();
+
+        try
+        {
+            _logger.LogInformation("Starting multi-language content generation...");
+            await SendProgress("Generating multi-language forums...", 0);
+
+            // Get available charters
+            var charters = await _db.Charters.ToListAsync(ct);
+            if (charters.Count == 0)
+            {
+                result.Errors.Add("No charters available");
+                return result;
+            }
+
+            // Generate a single development user for all content
+            var devUser = await _userManager.FindByEmailAsync("devadmin@localhost");
+            if (devUser == null)
+            {
+                result.Errors.Add("Dev admin user not found");
+                return result;
+            }
+
+            int totalSteps = forumCount + (forumCount * threadsPerForum) + (forumCount * threadsPerForum * repliesPerThread);
+            int completedSteps = 0;
+
+            var random = new Random();
+            var usedThemes = new HashSet<string>();
+
+            // Create forums in different languages
+            for (int f = 0; f < forumCount; f++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Rotate through languages
+                var languageCode = languages[f % languages.Length];
+                var languageName = SupportedLanguages.GetValueOrDefault(languageCode, "English");
+
+                // Pick a theme
+                var theme = ForumThemes[f % ForumThemes.Length];
+                usedThemes.Add(theme);
+
+                var charter = charters[random.Next(charters.Count)];
+                var forumName = await GenerateForumNameAsync(theme, languageCode, languageName, usedThemes, ct);
+                var description = await GenerateForumDescriptionAsync(forumName, theme, languageCode, languageName, ct);
+                var slug = Slugify(forumName);
+
+                _logger.LogInformation("Creating forum '{Name}' in {Language} ({Code})", forumName, languageName, languageCode);
+
+                var forum = await _forumService.CreateAsync(
+                    name: forumName,
+                    slug: slug,
+                    description: description,
+                    createdById: devUser.Id,
+                    sourceLanguage: languageCode,
+                    charterId: charter.Id,
+                    ct: ct);
+
+                result.ForumsCreated++;
+                completedSteps++;
+                await SendProgress($"Created forum: {forumName}", CalculateProgress(completedSteps, totalSteps));
+
+                // Delay between forums to avoid overwhelming the system
+                if (forumDelayMs > 0)
+                    await Task.Delay(forumDelayMs, ct);
+
+                // Create threads in this forum
+                for (int t = 0; t < threadsPerForum; t++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var title = await GenerateThreadTitleAsync(forumName, languageCode, languageName, ct);
+                    var content = await GenerateThreadContentAsync(title, forumName, languageCode, languageName, ct);
+
+                    _logger.LogInformation("Creating thread '{Title}' in {Language}", title, languageName);
+
+                    var thread = await _threadService.CreateAsync(
+                        forumId: forum.Id,
+                        title: title,
+                        content: content,
+                        authorId: devUser.Id,
+                        sourceLanguage: languageCode,
+                        ct: ct);
+
+                    result.ThreadsCreated++;
+                    result.MessagesCreated++; // Root message
+                    completedSteps++;
+                    await SendProgress($"Created thread: {title}", CalculateProgress(completedSteps, totalSteps));
+
+                    // Delay between threads
+                    if (threadDelayMs > 0)
+                        await Task.Delay(threadDelayMs, ct);
+
+                    // Create replies
+                    for (int r = 0; r < repliesPerThread; r++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        // Optionally vary the language for replies to test multi-language conversations
+                        var replyLanguageCode = random.Next(100) < 70 ? languageCode : languages[random.Next(languages.Length)];
+                        var replyLanguageName = SupportedLanguages.GetValueOrDefault(replyLanguageCode, "English");
+
+                        var replyContent = await GenerateReplyContentAsync(title, content, replyLanguageCode, replyLanguageName, ct);
+
+                        _logger.LogInformation("Creating reply in {Language}", replyLanguageName);
+
+                        await _messageService.ReplyAsync(
+                            threadId: thread.Id,
+                            parentMessageId: thread.RootMessageId!.Value,
+                            content: replyContent,
+                            authorId: devUser.Id,
+                            sourceLanguage: replyLanguageCode,
+                            ct: ct);
+
+                        result.MessagesCreated++;
+                        completedSteps++;
+                        await SendProgress($"Created reply {r + 1}/{repliesPerThread}", CalculateProgress(completedSteps, totalSteps));
+
+                        // Delay between replies
+                        if (replyDelayMs > 0)
+                            await Task.Delay(replyDelayMs, ct);
+                    }
+                }
+            }
+
+            result.Messages.Add($"Generated {result.ForumsCreated} forums with {result.ThreadsCreated} threads and {result.MessagesCreated} messages in {languages.Length} languages");
+            await SendComplete("Multi-language content generation complete!", result);
+            _logger.LogInformation("Multi-language content generation completed successfully");
+        }
+        catch (OperationCanceledException)
+        {
+            result.Success = false;
+            result.Errors.Add("Operation was cancelled");
+            await SendError("Content generation was cancelled");
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Errors.Add($"Error: {ex.Message}");
+            _logger.LogError(ex, "Error during multi-language content generation");
+            await SendError($"Error: {ex.Message}");
+        }
+
+        return result;
     }
 
     private static string Slugify(string text)

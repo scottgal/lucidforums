@@ -87,7 +87,7 @@ public class OllamaTranslationProvider : IAiTranslationProvider
             }
         }
         catch
-        {
+        { 
         }
         return result;
     }

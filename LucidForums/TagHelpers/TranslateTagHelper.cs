@@ -48,17 +48,22 @@ public class TranslateTagHelper : TagHelper
         // Generate a unique, compact ID based on the translation key for HTMX targeting
         // Using a hash ensures IDs are valid and collision-resistant
         var elementId = $"t-{ContentHash.Generate(Key)}";
+        var contentHash = ContentHash.Generate(defaultText);
 
         // Output span with attributes optimized for HTMX OOB swaps
         output.TagName = "span";
         output.Attributes.SetAttribute("id", elementId); // Required for HTMX OOB targeting
         output.Attributes.SetAttribute("data-translate-key", Key);
-        output.Attributes.SetAttribute("data-content-hash", ContentHash.Generate(defaultText)); // For change detection
+        output.Attributes.SetAttribute("data-content-hash", contentHash); // For change detection
+        output.Attributes.SetAttribute("data-translate-type", "ui-string"); // Identify translation type
 
         if (!string.IsNullOrEmpty(Category))
             output.Attributes.SetAttribute("data-translate-category", Category);
 
+        // Add wrapper for content + progress indicator
+        var progressIndicator = "<span class=\"translate-progress\" style=\"display:none;\"><span class=\"loading loading-spinner loading-xs ml-1\"></span></span>";
+
         // Allow translations to include intentional HTML markup
-        output.Content.SetHtmlContent(translatedText);
+        output.Content.SetHtmlContent($"{translatedText}{progressIndicator}");
     }
 }

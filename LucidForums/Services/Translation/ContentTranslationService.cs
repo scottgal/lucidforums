@@ -95,7 +95,16 @@ public class ContentTranslationService : IContentTranslationService
                         AiModel = reusableTranslation.AiModel
                     };
                     db.ContentTranslations.Add(reference);
-                    await db.SaveChangesAsync(ct);
+                    try
+                    {
+                        await db.SaveChangesAsync(ct);
+                    }
+                    catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("duplicate key") == true)
+                    {
+                        // Race condition: another thread created this reference, ignore
+                        _logger.LogDebug("Translation reference for {ContentType}:{ContentId}.{FieldName} in {Language} was already created",
+                            contentType, contentId, fieldName, targetLanguage);
+                    }
                 }
 
                 return reusableTranslation.TranslatedText;
@@ -149,8 +158,25 @@ public class ContentTranslationService : IContentTranslationService
         {
             await using var db = await _dbFactory.CreateDbContextAsync(ct);
 
-            if (existing != null)
+            // Re-check if translation was created by another thread while we were translating
+            var current = await db.ContentTranslations
+                .FirstOrDefaultAsync(t =>
+                    t.ContentType == contentType &&
+                    t.ContentId == contentId &&
+                    t.FieldName == fieldName &&
+                    t.LanguageCode == targetLanguage, ct);
+
+            if (current != null)
             {
+                // Another thread created it, update it
+                current.TranslatedText = translatedText;
+                current.SourceHash = sourceHash;
+                current.IsStale = false;
+                current.UpdatedAtUtc = DateTime.UtcNow;
+            }
+            else if (existing != null)
+            {
+                // We had an existing one from before, update it
                 existing.TranslatedText = translatedText;
                 existing.SourceHash = sourceHash;
                 existing.IsStale = false;
@@ -158,6 +184,7 @@ public class ContentTranslationService : IContentTranslationService
             }
             else
             {
+                // Create new translation
                 var newTranslation = new ContentTranslation
                 {
                     ContentType = contentType,
@@ -172,18 +199,47 @@ public class ContentTranslationService : IContentTranslationService
                 db.ContentTranslations.Add(newTranslation);
             }
 
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("duplicate key") == true)
+            {
+                // Race condition: another thread inserted this translation between our check and save
+                // This is fine - the translation is in the database now, just log and continue
+                _logger.LogDebug("Translation for {ContentType}:{ContentId}.{FieldName} in {Language} was already created by another thread",
+                    contentType, contentId, fieldName, targetLanguage);
+            }
         }
         finally
         {
             _dbLock.Release();
         }
 
-        // Broadcast the translation via SignalR so connected clients can update in real-time
+        // Broadcast the translation via SignalR using HTMX OOB swap for immediate updates
         _ = Task.Run(async () =>
         {
             try
             {
+                // Generate element ID and HTML fragment for OOB swap
+                var elementId = $"content-{contentType}-{contentId}-{fieldName}";
+                var encoded = System.Net.WebUtility.HtmlEncode(translatedText).Replace("\n", "<br/>");
+                var html = $"<div id=\"{elementId}\" data-content-type=\"{contentType}\" data-content-id=\"{contentId}\" data-content-field=\"{fieldName}\" data-content-hash=\"{sourceHash}\" data-translate-type=\"content\" hx-swap-oob=\"true\">{encoded}<span class=\"translate-progress\" style=\"display:none;\"><span class=\"loading loading-spinner loading-xs ml-1\"></span></span></div>";
+
+                // Broadcast OOB-compatible HTML fragment
+                await _hubContext.Clients.All.SendAsync(
+                    "TranslationOOBSwap",
+                    new
+                    {
+                        ElementId = elementId,
+                        Html = html,
+                        ContentType = contentType,
+                        ContentId = contentId,
+                        FieldName = fieldName,
+                        LanguageCode = targetLanguage
+                    });
+
+                // Also send the legacy event for backward compatibility
                 await _hubContext.Clients.All.SendAsync(
                     "ContentTranslated",
                     new

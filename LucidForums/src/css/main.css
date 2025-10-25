@@ -75,4 +75,44 @@
     .prose-header { @apply prose max-w-none; }
     .link-row { @apply mt-2 flex gap-4 flex-wrap; }
     .action-row { @apply mt-4; }
+
+    /* Translation effects */
+    .translate-pending {
+        @apply opacity-80;
+    }
+
+    .translate-flash {
+        animation: translateFlash 0.6s ease-in-out;
+    }
+
+    .translations-active::after {
+        content: "";
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        width: 0.5rem;
+        height: 0.5rem;
+        background: #3b82f6;
+        border-radius: 50%;
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        z-index: 9999;
+    }
+}
+
+@keyframes translateFlash {
+    0%, 100% {
+        background-color: transparent;
+    }
+    50% {
+        background-color: rgba(59, 130, 246, 0.2);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }

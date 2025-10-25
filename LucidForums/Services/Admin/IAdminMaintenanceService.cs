@@ -101,6 +101,13 @@ public class AdminMaintenanceService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
         {
+            // Clear translations and translation queue first
+            db.ContentTranslations.RemoveRange(db.ContentTranslations);
+            await db.SaveChangesAsync(ct);
+
+            db.TranslationQueue.RemoveRange(db.TranslationQueue);
+            await db.SaveChangesAsync(ct);
+
             // Remove forum memberships first
             db.ForumUsers.RemoveRange(db.ForumUsers);
             await db.SaveChangesAsync(ct);
@@ -129,6 +136,7 @@ public class AdminMaintenanceService(
             }
 
             await tx.CommitAsync(ct);
+            logger.LogInformation("Successfully cleared all content (forums, threads, messages, translations, embeddings)");
         }
         catch
         {
