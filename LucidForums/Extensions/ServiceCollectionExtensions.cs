@@ -301,8 +301,36 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddLucidForumsAll(this IServiceCollection services, IConfiguration configuration)
     {
-        // Optional: register EasyNMT-based translation provider if configured
+        // Optional: register CTranslate2-based translation provider if configured
         var translationProvider = configuration["Translation:Provider"];
+        var ctranslate2Endpoint = configuration["CTRANSLATE2_ENDPOINT"] ?? configuration["Translation:CTranslate2:Endpoint"]; // e.g., http://localhost:5000/
+        if (!string.IsNullOrWhiteSpace(translationProvider) && translationProvider.Equals("ctranslate2", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(ctranslate2Endpoint))
+        {
+            services.AddHttpClient("ctranslate2", client =>
+            {
+                var baseUrl = string.IsNullOrWhiteSpace(ctranslate2Endpoint) ? "http://localhost:5000/" : ctranslate2Endpoint;
+                client.BaseAddress = new Uri(baseUrl);
+                client.Timeout = TimeSpan.FromSeconds(120);
+            });
+            var providerType = Type.GetType("mostlylucid.llmtranslate.Services.Providers.CTranslate2TranslationProvider, mostlylucid.llmtranslate");
+            var ifaceType = Type.GetType("mostlylucid.llmtranslate.Services.IAiTranslationProvider, mostlylucid.llmtranslate");
+            if (providerType != null && ifaceType != null)
+            {
+                services.AddScoped(ifaceType, sp =>
+                {
+                    var factory = sp.GetRequiredService<IHttpClientFactory>();
+                    var http = factory.CreateClient("ctranslate2");
+                    var loggerType = typeof(ILogger<>).MakeGenericType(providerType);
+                    var logger = sp.GetRequiredService(loggerType);
+                    return Activator.CreateInstance(providerType, http, logger, ctranslate2Endpoint)!
+                           ?? throw new InvalidOperationException("Failed to create CTranslate2TranslationProvider");
+                });
+            }
+        }
+
+        // Optional: register EasyNMT-based translation provider if configured
+        translationProvider = configuration["Translation:Provider"];
         var easynmtEndpoint = configuration["EASYNMT_ENDPOINT"] ?? configuration["Translation:EasyNmt:Endpoint"]; // e.g., http://easynmt:8081/ or http://localhost:24080/
         if (!string.IsNullOrWhiteSpace(translationProvider) && translationProvider.Equals("easynmt", StringComparison.OrdinalIgnoreCase)
             || !string.IsNullOrWhiteSpace(easynmtEndpoint))
